@@ -1,0 +1,29 @@
+syntax = "proto2";
+
+package witchcraft;
+
+message PartOfSpeech {
+  required string pos = 1;
+}
+
+message Word {
+  required PartOfSpeech partOfSpeech = 1;
+  required string word = 2;
+  required string lemma = 3;
+  required bool isStopWord = 4;
+  required string shape = 5;
+  required string postWhitespace = 6;
+  required bool isAlphaWord = 7;
+}
+
+message Phrase {
+  repeated Word words = 1;
+}
+
+message Sentence {
+  repeated Phrase phrases = 1;
+}
+
+message SentenceSequence {
+  repeated Sentence sentences = 1;
+}
