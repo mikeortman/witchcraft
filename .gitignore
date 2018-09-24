@@ -1,2 +1,6 @@
 data/
 .idea
+.eggs
+.mypy_cache/
+witchcraft.egg-info/
+__pycache__/
