@@ -1,5 +1,5 @@
 # Witchcraft
-Witchcraft is an engine providing a set of tools capable of encoding documents of various content types (flat, heirarchical, or series structured) into searchable latent vector space. Goal is to provide models capable of encoding images, videos, audio, text, tables, lists, and more.
+Witchcraft is a toolkit capable of encoding documents of various content types and structure (flat, hierarchical, or series) into searchable latent vector space. Goal is to provide models capable of encoding images, videos, audio, text, tables, lists, and more.
 
 ## Warning
 Right now this project is full of hot air. I'm slowly converting a mangled mess of test scripts into something actually usable. Demos of usage coming later and documentation is all in my head at the moment. Stay tuned
