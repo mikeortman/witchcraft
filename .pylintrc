@@ -80,6 +80,7 @@ disable=missing-docstring,
         useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
+        too-few-public-methods,
         apply-builtin,
         basestring-builtin,
         buffer-builtin,
@@ -218,7 +219,6 @@ spelling-store-unknown-words=no
 # List of note tags to take in consideration, separated by a comma.
 notes=FIXME,
       XXX
-
 
 [TYPECHECK]
 
