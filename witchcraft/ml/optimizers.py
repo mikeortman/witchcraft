@@ -1,15 +1,19 @@
 import tensorflow as tf
+from typing import Optional
 
 class Optimizer:
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: Optional[str] = None) -> None:
         self._name = name
+
+        if self._name is None:
+            self._name = "Default Optimizer"
 
     def get_name(self) -> str:
         return self._name
 
-    # pylint: disable=R0201
     def to_tf_optimizer(self) -> tf.train.Optimizer:
-        return tf.train.GradientDescentOptimizer(learning_rate=1.0)
+        return tf.train.GradientDescentOptimizer(learning_rate=1.0, name=self.get_name())
+
 
 class WitchcraftAdamOptimizer(Optimizer):
     def __init__(self,
@@ -42,7 +46,9 @@ class WitchcraftAdamOptimizer(Optimizer):
             beta1=self.get_beta_1(),
             beta2=self.get_beta_2(),
             epsilon=self.get_epsilon(),
+            name=self.get_name()
         )
+
 
 class WitchcraftAdagradOptimizer(Optimizer):
     def __init__(self,
@@ -62,8 +68,10 @@ class WitchcraftAdagradOptimizer(Optimizer):
     def to_tf_optimizer(self) -> tf.train.Optimizer:
         return tf.train.AdagradOptimizer(
             learning_rate=self.get_learning_rate(),
-            initial_accumulator_value=self.get_initial_accumulator_value()
+            initial_accumulator_value=self.get_initial_accumulator_value(),
+            name=self.get_name()
         )
+
 
 class WitchcraftGradientDescentOptimizer(Optimizer):
     def __init__(self, learning_rate: float = 1.0) -> None:
@@ -75,8 +83,10 @@ class WitchcraftGradientDescentOptimizer(Optimizer):
 
     def to_tf_optimizer(self) -> tf.train.Optimizer:
         return tf.train.GradientDescentOptimizer(
-            learning_rate=self.get_learning_rate()
+            learning_rate=self.get_learning_rate(),
+            name=self.get_name()
         )
+
 
 class WitchcraftMomentumOptimizer(Optimizer):
     def __init__(self, learning_rate: float = 1.0, momentum: float = 0.9) -> None:
@@ -93,5 +103,6 @@ class WitchcraftMomentumOptimizer(Optimizer):
     def to_tf_optimizer(self) -> tf.train.Optimizer:
         return tf.train.MomentumOptimizer(
             learning_rate=self.get_learning_rate(),
-            momentum=self.get_momentum()
+            momentum=self.get_momentum(),
+            name=self.get_name()
         )
