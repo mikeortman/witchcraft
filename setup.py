@@ -10,7 +10,7 @@ setup(
     url="https://github.com/mikeortman/witchcraft",
     packages=["witchcraft", "witchcraft.nlp"],
     install_requires=[
-        'spacy'
+        'spacy', 'tensorflow'
     ],
     setup_requires=[
         'pytest-runner', 'pytest-pylint', 'pytest-mypy', 'mypy-protobuf', 'protobuf'
