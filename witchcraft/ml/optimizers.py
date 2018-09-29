@@ -1,12 +1,9 @@
-import tensorflow as tf
 from typing import Optional
+import tensorflow as tf
 
 class Optimizer:
     def __init__(self, name: Optional[str] = None) -> None:
-        self._name = name
-
-        if self._name is None:
-            self._name = "Default Optimizer"
+        self._name = name if name is not None else "Default Optimizer"
 
     def get_name(self) -> str:
         return self._name

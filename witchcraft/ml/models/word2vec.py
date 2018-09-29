@@ -1,6 +1,7 @@
 from typing import Optional, Generator, Tuple
-from witchcraft.ml.optimizers import Optimizer
 import tensorflow as tf
+
+from witchcraft.ml.optimizers import Optimizer
 
 
 class Word2VecHyperparameters:
@@ -72,12 +73,10 @@ class Word2VecHyperparameters:
 
 class Word2VecModel:
     # Classic word2vec model for use with witchcraft
-    def __init__(
-        self,
-        training_pair_generator: Generator[Tuple[str, str], None, None],
-        vocab_size: int,
-        hyperparameters: Optional[Word2VecHyperparameters] = None
-    ):
+    def __init__(self,
+                 training_pair_generator: Generator[Tuple[str, str], None, None],
+                 vocab_size: int,
+                 hyperparameters: Optional[Word2VecHyperparameters] = None) -> None:
         if hyperparameters is None:
             hyperparameters = Word2VecHyperparameters()
 
