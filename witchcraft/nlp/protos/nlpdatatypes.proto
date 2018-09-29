@@ -6,6 +6,12 @@ message PartOfSpeech {
   required string pos = 1;
 }
 
+message WordDependency {
+  required string dep = 1;
+  required uint32 headIndex = 2;
+  required uint32 myIndex = 3;
+}
+
 message Word {
   required PartOfSpeech partOfSpeech = 1;
   required string word = 2;
@@ -14,6 +20,7 @@ message Word {
   required string shape = 5;
   required string postWhitespace = 6;
   required bool isAlphaWord = 7;
+  required WordDependency dependency = 8;
 }
 
 message Phrase {

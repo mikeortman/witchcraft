@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='nlpdatatypes.proto',
   package='witchcraft',
   syntax='proto2',
-  serialized_pb=_b('\n\x12nlpdatatypes.proto\x12\nwitchcraft\"\x1b\n\x0cPartOfSpeech\x12\x0b\n\x03pos\x18\x01 \x02(\t\"\xa3\x01\n\x04Word\x12.\n\x0cpartOfSpeech\x18\x01 \x02(\x0b\x32\x18.witchcraft.PartOfSpeech\x12\x0c\n\x04word\x18\x02 \x02(\t\x12\r\n\x05lemma\x18\x03 \x02(\t\x12\x12\n\nisStopWord\x18\x04 \x02(\x08\x12\r\n\x05shape\x18\x05 \x02(\t\x12\x16\n\x0epostWhitespace\x18\x06 \x02(\t\x12\x13\n\x0bisAlphaWord\x18\x07 \x02(\x08\")\n\x06Phrase\x12\x1f\n\x05words\x18\x01 \x03(\x0b\x32\x10.witchcraft.Word\"/\n\x08Sentence\x12#\n\x07phrases\x18\x01 \x03(\x0b\x32\x12.witchcraft.Phrase\";\n\x10SentenceSequence\x12\'\n\tsentences\x18\x01 \x03(\x0b\x32\x14.witchcraft.Sentence')
+  serialized_pb=_b('\n\x12nlpdatatypes.proto\x12\nwitchcraft\"\x1b\n\x0cPartOfSpeech\x12\x0b\n\x03pos\x18\x01 \x02(\t\"A\n\x0eWordDependency\x12\x0b\n\x03\x64\x65p\x18\x01 \x02(\t\x12\x11\n\theadIndex\x18\x02 \x02(\r\x12\x0f\n\x07myIndex\x18\x03 \x02(\r\"\xd3\x01\n\x04Word\x12.\n\x0cpartOfSpeech\x18\x01 \x02(\x0b\x32\x18.witchcraft.PartOfSpeech\x12\x0c\n\x04word\x18\x02 \x02(\t\x12\r\n\x05lemma\x18\x03 \x02(\t\x12\x12\n\nisStopWord\x18\x04 \x02(\x08\x12\r\n\x05shape\x18\x05 \x02(\t\x12\x16\n\x0epostWhitespace\x18\x06 \x02(\t\x12\x13\n\x0bisAlphaWord\x18\x07 \x02(\x08\x12.\n\ndependency\x18\x08 \x02(\x0b\x32\x1a.witchcraft.WordDependency\")\n\x06Phrase\x12\x1f\n\x05words\x18\x01 \x03(\x0b\x32\x10.witchcraft.Word\"/\n\x08Sentence\x12#\n\x07phrases\x18\x01 \x03(\x0b\x32\x12.witchcraft.Phrase\";\n\x10SentenceSequence\x12\'\n\tsentences\x18\x01 \x03(\x0b\x32\x14.witchcraft.Sentence')
 )
 
 
@@ -53,6 +53,51 @@ _PARTOFSPEECH = _descriptor.Descriptor(
   ],
   serialized_start=34,
   serialized_end=61,
+)
+
+
+_WORDDEPENDENCY = _descriptor.Descriptor(
+  name='WordDependency',
+  full_name='witchcraft.WordDependency',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='dep', full_name='witchcraft.WordDependency.dep', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='headIndex', full_name='witchcraft.WordDependency.headIndex', index=1,
+      number=2, type=13, cpp_type=3, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='myIndex', full_name='witchcraft.WordDependency.myIndex', index=2,
+      number=3, type=13, cpp_type=3, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=63,
+  serialized_end=128,
 )
 
 
@@ -112,6 +157,13 @@ _WORD = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='dependency', full_name='witchcraft.Word.dependency', index=7,
+      number=8, type=11, cpp_type=10, label=2,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -124,8 +176,8 @@ _WORD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=64,
-  serialized_end=227,
+  serialized_start=131,
+  serialized_end=342,
 )
 
 
@@ -155,8 +207,8 @@ _PHRASE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=229,
-  serialized_end=270,
+  serialized_start=344,
+  serialized_end=385,
 )
 
 
@@ -186,8 +238,8 @@ _SENTENCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=272,
-  serialized_end=319,
+  serialized_start=387,
+  serialized_end=434,
 )
 
 
@@ -217,15 +269,17 @@ _SENTENCESEQUENCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=321,
-  serialized_end=380,
+  serialized_start=436,
+  serialized_end=495,
 )
 
 _WORD.fields_by_name['partOfSpeech'].message_type = _PARTOFSPEECH
+_WORD.fields_by_name['dependency'].message_type = _WORDDEPENDENCY
 _PHRASE.fields_by_name['words'].message_type = _WORD
 _SENTENCE.fields_by_name['phrases'].message_type = _PHRASE
 _SENTENCESEQUENCE.fields_by_name['sentences'].message_type = _SENTENCE
 DESCRIPTOR.message_types_by_name['PartOfSpeech'] = _PARTOFSPEECH
+DESCRIPTOR.message_types_by_name['WordDependency'] = _WORDDEPENDENCY
 DESCRIPTOR.message_types_by_name['Word'] = _WORD
 DESCRIPTOR.message_types_by_name['Phrase'] = _PHRASE
 DESCRIPTOR.message_types_by_name['Sentence'] = _SENTENCE
@@ -238,6 +292,13 @@ PartOfSpeech = _reflection.GeneratedProtocolMessageType('PartOfSpeech', (_messag
   # @@protoc_insertion_point(class_scope:witchcraft.PartOfSpeech)
   ))
 _sym_db.RegisterMessage(PartOfSpeech)
+
+WordDependency = _reflection.GeneratedProtocolMessageType('WordDependency', (_message.Message,), dict(
+  DESCRIPTOR = _WORDDEPENDENCY,
+  __module__ = 'nlpdatatypes_pb2'
+  # @@protoc_insertion_point(class_scope:witchcraft.WordDependency)
+  ))
+_sym_db.RegisterMessage(WordDependency)
 
 Word = _reflection.GeneratedProtocolMessageType('Word', (_message.Message,), dict(
   DESCRIPTOR = _WORD,

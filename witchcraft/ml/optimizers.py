@@ -1,6 +1,7 @@
 from typing import Optional
 import tensorflow as tf
 
+
 class Optimizer:
     def __init__(self, name: Optional[str] = None) -> None:
         self._name = name if name is not None else "Default Optimizer"

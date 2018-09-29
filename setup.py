@@ -15,5 +15,5 @@ setup(
     setup_requires=[
         'pytest-runner', 'pytest-pylint', 'pytest-mypy', 'mypy-protobuf', 'protobuf'
     ],
-    tests_require=["mypy", "pylint", "pytest"]
+    tests_require=["mypy", "pylint", "pytest", "spacy"]
 )

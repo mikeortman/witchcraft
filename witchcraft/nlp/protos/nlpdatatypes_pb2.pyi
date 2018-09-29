@@ -25,6 +25,21 @@ class PartOfSpeech(google___protobuf___message___Message):
     def MergeFrom(self, other_msg: google___protobuf___message___Message) -> None: ...
     def CopyFrom(self, other_msg: google___protobuf___message___Message) -> None: ...
 
+class WordDependency(google___protobuf___message___Message):
+    dep = ... # type: typing___Text
+    headIndex = ... # type: int
+    myIndex = ... # type: int
+
+    def __init__(self,
+        dep : typing___Text,
+        headIndex : int,
+        myIndex : int,
+        ) -> None: ...
+    @classmethod
+    def FromString(cls, s: bytes) -> WordDependency: ...
+    def MergeFrom(self, other_msg: google___protobuf___message___Message) -> None: ...
+    def CopyFrom(self, other_msg: google___protobuf___message___Message) -> None: ...
+
 class Word(google___protobuf___message___Message):
     word = ... # type: typing___Text
     lemma = ... # type: typing___Text
@@ -36,6 +51,9 @@ class Word(google___protobuf___message___Message):
     @property
     def partOfSpeech(self) -> PartOfSpeech: ...
 
+    @property
+    def dependency(self) -> WordDependency: ...
+
     def __init__(self,
         partOfSpeech : PartOfSpeech,
         word : typing___Text,
@@ -44,6 +62,7 @@ class Word(google___protobuf___message___Message):
         shape : typing___Text,
         postWhitespace : typing___Text,
         isAlphaWord : bool,
+        dependency : WordDependency,
         ) -> None: ...
     @classmethod
     def FromString(cls, s: bytes) -> Word: ...
