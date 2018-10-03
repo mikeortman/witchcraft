@@ -1,11 +1,11 @@
 from typing import List, Iterable, Optional, Generator
 from string import punctuation
+import re
+import csv
+
 from projects.naughty.protos.naughty_pb2 import UrbanDictionaryDefinition as UrbanDictionaryDefinitionProto
 from witchcraft.nlp.parse import Parser
 from witchcraft.nlp.datatypes import SentenceSequence
-
-import re
-import csv
 
 
 class UrbanDictionaryDefinition:
@@ -21,8 +21,8 @@ class UrbanDictionaryDefinition:
         if len(csv_row) < 6:
             return
 
-        self._word = csv_row[1].strip().lower().strip(punctuation)
-        self._definition = csv_row[5].strip().lower()
+        self._word = csv_row[1].strip().strip(punctuation)
+        self._definition = csv_row[5].strip()
 
         try:
             self._upvotes = int(csv_row[2])
@@ -36,7 +36,7 @@ class UrbanDictionaryDefinition:
             self._word = self.clean_definition_string(self._word)
             definition_lines = self._definition.split(';;')
             definition_lines = [self.clean_definition_string(d) for d in definition_lines]
-            self._definition = '\n'.join([d for d in definition_lines if len(d) > 0])
+            self._definition = '\n'.join([d for d in definition_lines if d != ""])
 
             self._word_parsed: SentenceSequence = Parser.parse_string_to_sentence_sequence(self._word)
             self._definition_parsed: SentenceSequence = Parser.parse_string_to_sentence_sequence(self._definition)
@@ -82,24 +82,24 @@ class UrbanDictionaryDefinition:
         self._validated = True
         return self._validated
 
-    def clean_definition_string(self, str_in: str) -> str:
+    @staticmethod
+    def clean_definition_string(str_in: str) -> str:
         # Remove letters that appear more than twice
         str_in = str_in.strip()
         if len(str_in) > 3:
             new_str: List[str] = [str_in[0], str_in[1], str_in[2]]
-
             for i in range(3, len(str_in)):
-                greatGrandParent = str_in[i - 3]
-                grandParent = str_in[i - 2]
+                great_grandparent = str_in[i - 3]
+                grandparent = str_in[i - 2]
                 parent = str_in[i - 1]
                 child = str_in[i]
 
-                if greatGrandParent is child and grandParent is child and parent is child:
+                if great_grandparent is child and grandparent is child and parent is child:
                     continue
 
                 new_str += [child]
 
-                str_in = ''.join(new_str)
+            str_in = ''.join(new_str)
 
             str_in = re.sub(r"^(?:#?[0-9a-z]{1,2} *(?:->|=>|-|\.|\)|,)+|\-+) *", "", str_in)  # Remove list ordinals.
             str_in = re.sub(r"[\\[\]]", "", str_in)  # Remove brackets.

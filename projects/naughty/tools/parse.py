@@ -1,7 +1,10 @@
-from projects.naughty.definition import UrbanDictionaryDefinition
-from google.protobuf.json_format import MessageToJson
-
 import sys
+from google.protobuf.json_format import MessageToJson
+from projects.naughty.definition import UrbanDictionaryDefinition
 
+i = 0
 for definition in UrbanDictionaryDefinition.generate_from_csv(iter(sys.stdin.readline, '')):
-    print(MessageToJson(definition.to_protobuf()))
+    pb = definition.to_protobuf()
+    i += 1
+    if i % 100 == 0:
+        print ("Done: " + str(i))

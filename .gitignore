@@ -4,3 +4,5 @@ data/
 .mypy_cache/
 witchcraft.egg-info/
 __pycache__/
+build/
+dist/

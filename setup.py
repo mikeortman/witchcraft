@@ -8,7 +8,7 @@ setup(
     author="Mike Ortman",
     author_email="mikeortman@gmail.com",
     url="https://github.com/mikeortman/witchcraft",
-    packages=["witchcraft", "witchcraft.nlp", "witchcraft.ml"],
+    packages=["witchcraft", "witchcraft.nlp", "witchcraft.nlp.protos", "witchcraft.ml", "projects", "projects.naughty", "projects.naughty.protos"],
     install_requires=[
         'spacy', 'tensorflow'
     ],
