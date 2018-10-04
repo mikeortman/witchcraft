@@ -12,7 +12,7 @@ class PartOfSpeech:
     def __init__(self, pos: Optional[str] = None) -> None:
         self._pos = pos if pos is not None else 'UNK'
 
-    def to_string(self) -> str:
+    def __str__(self) -> str:
         return self._pos
 
     def to_protobuf(self) -> PartOfSpeechProto:
@@ -128,7 +128,7 @@ class Phrase:
         for word in self._words:
             yield word
 
-    def to_string(self) -> str:
+    def __str__(self)-> str:
         # TODO: Make Faster
         return ''.join(
             [w.get_word_string() + w.get_whitespace_postfix() for w in self.get_word_generator()]
@@ -157,8 +157,8 @@ class Sentence:
         for phrase in self._phrases:
             yield phrase
 
-    def to_string(self) -> str:
-        return ''.join([p.to_string() for p in self.get_phrase_generator()])
+    def __str__(self) -> str:
+        return ''.join([str(p) for p in self.get_phrase_generator()])
 
     def to_protobuf(self) -> SentenceProto:
         return SentenceProto(
@@ -177,6 +177,9 @@ class SentenceSequence:
     def get_sentence_generator(self) -> Generator[Sentence, None, None]:
         for sentence in self._sentences:
             yield sentence
+
+    def __str__(self) -> str:
+        return ''.join([str(s) for s in self.get_sentence_generator()])
 
     def to_protobuf(self) -> SentenceSequenceProto:
         return SentenceSequenceProto(
