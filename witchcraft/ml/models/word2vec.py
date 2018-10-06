@@ -1,35 +1,40 @@
-from typing import Optional, Generator, Tuple
+from typing import Optional, Dict, List, Tuple, Generator
 import tensorflow as tf
 
-from witchcraft.ml.optimizers import Optimizer
 
+from witchcraft.ml.optimizers import Optimizer
+from witchcraft.ml.datasets import WitchcraftDataset
+from witchcraft.nlp.datatypes import SentenceSequence
 
 class Word2VecHyperparameters:
     def __init__(self) -> None:
         self._embedding_size: int = 300
         self._batch_size: int = 64
         self._negative_sample_count: int = 64
-        self._min_token_count: int = 20
+        self._min_word_count: int = 20
         self._max_vocab_size: Optional[int] = None
-        self._window_size: int = 5
+        self._window_size: int = 3
         self._subsample_threshold: Optional[float] = None
         self._optimizer: Optimizer = Optimizer()
         self._name: Optional[str] = None
 
-    def set_embedding_size(self, embedding_size: int) -> None:
+    def set_embedding_size(self, embedding_size: int) -> 'Word2VecHyperparameters':
         self._embedding_size = embedding_size
+        return self
 
     def get_embedding_size(self) -> int:
         return self._embedding_size
 
-    def set_batch_size(self, batch_size) -> None:
+    def set_batch_size(self, batch_size: int) -> 'Word2VecHyperparameters':
         self._batch_size = batch_size
+        return self
 
     def get_batch_size(self) -> int:
         return self._batch_size
 
-    def set_negative_sample_count(self, negative_sample_count: int) -> None:
+    def set_negative_sample_count(self, negative_sample_count: int) -> 'Word2VecHyperparameters':
         self._negative_sample_count = negative_sample_count
+        return self
 
     def get_negative_sample_count(self) -> int:
         return self._negative_sample_count
@@ -37,45 +42,186 @@ class Word2VecHyperparameters:
     def get_name(self) -> str:
         return self._name if self._name is not None else "<default>"
 
-    def set_name(self, name) -> None:
+    def set_name(self, name) -> 'Word2VecHyperparameters':
         self._name = name
+        return self
 
-    def set_minimum_token_count(self, min_token_count) -> None:
-        self._min_token_count = min_token_count
+    def set_min_word_count(self, min_word_count: int) -> 'Word2VecHyperparameters':
+        self._min_word_count = min_word_count
+        return self
 
-    def get_minimum_token_count(self) -> Optional[int]:
-        return self._min_token_count
+    def get_min_word_count(self) -> Optional[int]:
+        return self._min_word_count
 
-    def set_max_vocab_size(self, max_vocab_size) -> None:
+    def set_max_vocab_size(self, max_vocab_size: Optional[int]) -> 'Word2VecHyperparameters':
         self._max_vocab_size = max_vocab_size
+        return self
 
     def get_max_vocab_size(self) -> Optional[int]:
         return self._max_vocab_size
 
-    def set_skipgram_window_size(self, window_size) -> None:
+    def set_skipgram_window_size(self, window_size: int) -> 'Word2VecHyperparameters':
         self._window_size = window_size
+        return self
 
     def get_skipgram_window_size(self) -> int:
         return self._window_size
 
-    def set_subsampling_threshold(self, subsample_threshold) -> None:
+    def set_subsampling_threshold(self, subsample_threshold: Optional[float]) -> 'Word2VecHyperparameters':
         self._subsample_threshold = subsample_threshold
+        return self
 
     def get_subsampling_threshold(self) -> Optional[float]:
         return self._subsample_threshold
 
-    def set_optimizer(self, optimizer: Optimizer) -> None:
+    def set_optimizer(self, optimizer: Optimizer) -> 'Word2VecHyperparameters':
         self._optimizer = optimizer
+        return self
 
     def get_optimizer(self) -> Optimizer:
         return self._optimizer
+
+class Word2VecVocab:
+    def __init__(self, hyperparameters: Optional[Word2VecHyperparameters],
+                 pruned: Dict[str, int],
+                 pruned_word_to_id: Dict[str, int],
+                 pruned_id_to_word: List[str]) -> None:
+        if hyperparameters is None:
+            hyperparameters = Word2VecHyperparameters()
+
+        self._hyperparameters: Word2VecHyperparameters = hyperparameters
+        self._pruned: Dict[str, int] = pruned
+        self._pruned_word_to_id: Dict[str, int] = pruned_word_to_id
+        self._pruned_id_to_word: List[str] = pruned_id_to_word
+        self._vocab_size: int = len(self._pruned_id_to_word)
+
+    def word_to_id(self, word: str) -> int:
+        if word not in self._pruned_word_to_id:
+            return None
+
+        return self._pruned_word_to_id[word]
+
+    def id_to_word(self, id: int) -> Optional[str]:
+        if id not in self._pruned_id_to_word:
+            return None
+
+        return self._pruned_id_to_word[id]
+
+    def get_vocab_size(self):
+        return self._vocab_size
+
+    def get_vocab(self):
+        return self._pruned
+
+    def save_metaata(self) -> None:
+        with open("words_" + self._hyperparameters.get_name() + ".tsv", "w") as fout:
+            for word in self._pruned_id_to_word:
+                fout.write(word + "\n")
+
+    def get_skipgrams_for_sequence(self, seq: SentenceSequence) -> List[Tuple[int, int]]:
+        skipgrams = []
+
+        def generate_skipgrams(sentence: List[Optional[int]]) -> Generator[Tuple[int, int], None, None]:
+            sentence_size: int = len(sentence)
+            window_size: int = self._hyperparameters.get_skipgram_window_size()
+
+            for i in range(sentence_size):
+                current_word = sentence[i]
+                if current_word is None:
+                    continue
+
+                for y in range(1, window_size + 1):
+                    if i - y >= 0 and sentence[i - y] is not None:
+                        yield (current_word, sentence[i - y])
+
+                for y in range(1, window_size + 1):
+                    if i + y < sentence_size and sentence[i + y] is not None:
+                            yield (current_word, sentence[i + y])
+
+        for sentence in seq.get_sentence_generator():
+            words = [w.get_word_string_normalized() for w in sentence.get_word_generator() if w.provides_contextual_value()]
+            words = [self.word_to_id(w) for w in words]
+            for skipgram in generate_skipgrams(words):
+                skipgrams += [skipgram]
+
+        return skipgrams
+
+class Word2VecVocabBuilder:
+    def __init__(self) -> None:
+        self._vocab: Dict[str, int] = {}
+        self._last_built_vocab: Optional[Word2VecVocab] = None
+
+    def add_word_count_to_vocab(self, word: str, count: int) -> None:
+        if word not in self._vocab:
+            self._vocab[word] = 0
+
+        self._vocab[word] += count
+        self._last_built_vocab = None #Invalidate the build vocab
+
+    def build(self, hyperparameters: Optional[Word2VecHyperparameters] = None) -> Word2VecVocab:
+        if hyperparameters is None:
+            hyperparameters = Word2VecHyperparameters()
+
+        if self._last_built_vocab is not None:
+            return self._last_built_vocab
+
+        pruned = [(k,v) for k,v in self._vocab.items() if v >= hyperparameters.get_min_word_count()]
+        pruned.sort(key=lambda x: -x[1])
+
+
+
+        # Subsampling
+        # if hyperparameters.get_subsampling_threshold() is not None:
+        #     log.info("Subsampling enabled. Calculating corpus size...")
+        #     total_tokens = 0
+        #     for token, count in tokenCounts:
+        #         total_tokens += count
+        #
+        #     log.info("Total tokens: " + str(totalTokensInCorpus) + ". Performing subsampling...")
+        #     tokensToKeep = []
+        #     for token, count in tokenCounts:
+        #         token_freq = count / totalTokensInCorpus
+        #         if token_freq >= hyperparameters.get_subsampling_threshold():
+        #             log.info("Removing '" + token + "' during subsampling; frequency: " + str(token_freq * 100) + "%")
+        #             continue
+        #
+        #         tokensToKeep += [(token, count)]
+        #
+        #     tokenCounts = tokensToKeep
+        # else:
+        #     log.info("Subsampling disabled.")
+
+
+        max_vocab_size = hyperparameters.get_max_vocab_size()
+        if max_vocab_size is not None:
+            pruned = pruned[:max_vocab_size]
+
+        pruned_word_to_id = {}
+        pruned_id_to_word = []
+
+        i = 0
+        for (word, word_count) in pruned:
+            pruned_word_to_id[word] = i
+            pruned_id_to_word += [word]
+            i += 1
+
+        pruned = {k: v for (k, v) in pruned}
+
+        self._last_built_vocab = Word2VecVocab(
+            hyperparameters=hyperparameters,
+            pruned=pruned,
+            pruned_word_to_id=pruned_word_to_id,
+            pruned_id_to_word=pruned_id_to_word
+        )
+
+        return self._last_built_vocab
 
 
 class Word2VecModel:
     # Classic word2vec model for use with witchcraft
     def __init__(self,
-                 training_pair_generator: Generator[Tuple[str, str], None, None],
-                 vocab_size: int,
+                 dataset: WitchcraftDataset, #Assumes tuple int pairs.
+                 vocab: Word2VecVocab,
                  hyperparameters: Optional[Word2VecHyperparameters] = None) -> None:
         if hyperparameters is None:
             hyperparameters = Word2VecHyperparameters()
@@ -83,25 +229,26 @@ class Word2VecModel:
         self._hyperparameters: Word2VecHyperparameters = hyperparameters
         self._graph = tf.Graph()
         self._session = tf.Session(graph=self._graph)
+        self._vocab = vocab
 
         with self._graph.as_default():
-            self._dataset = tf.data.Dataset.from_generator(
-                training_pair_generator,
-                (tf.int32, tf.int32),
-                output_shapes=(tf.TensorShape([None]), tf.TensorShape([None]))
-            )
+            # self._dataset = tf.data.Dataset.from_generator(
+            #     training_pair_generator,
+            #     (tf.int32, tf.int32),
+            #     output_shapes=(tf.TensorShape([None]), tf.TensorShape([None]))
+            # )
 
+            self._dataset = dataset
             self._dataset = self._dataset.shuffle(buffer_size=500000)
             self._dataset = self._dataset.repeat()
             self._dataset = self._dataset.prefetch(buffer_size=1000000)
-            self._dataset = self._dataset.make_one_shot_iterator()
 
-            (center_words, target_words) = self._dataset.get_next()
+            (center_words, target_words) = self._dataset.to_tf_iterator().get_next()
             target_words = tf.expand_dims(target_words, axis=-1)
 
             embedding_size = self._hyperparameters.get_embedding_size()
             self._word_embed_matrix = tf.Variable(
-                tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),
+                tf.random_uniform([self._vocab.get_vocab_size(), embedding_size], -1.0, 1.0),
                 name="WordEmbeddingsMatrix"
             )
 
@@ -109,13 +256,13 @@ class Word2VecModel:
 
             nce_weights = tf.Variable(
                 tf.truncated_normal(
-                    [vocab_size, embedding_size],
+                    [self._vocab.get_vocab_size(), embedding_size],
                     stddev=1.0 / embedding_size ** 0.5
                 ),
                 name="NoiseConstrastiveWeights"
             )
 
-            nce_bias = tf.Variable(tf.zeros([vocab_size]), name="NoiseConstrastiveBiases")
+            nce_bias = tf.Variable(tf.zeros([self._vocab.get_vocab_size()]), name="NoiseConstrastiveBiases")
 
             self._loss = tf.reduce_mean(
                 tf.nn.nce_loss(
@@ -124,7 +271,7 @@ class Word2VecModel:
                     labels=target_words,
                     inputs=center_embeddings,
                     num_sampled=self._hyperparameters.get_negative_sample_count(),
-                    num_classes=vocab_size
+                    num_classes=self._vocab.get_vocab_size()
                 ),
                 name="MeanNCELoss"
             )

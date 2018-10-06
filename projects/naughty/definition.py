@@ -31,6 +31,14 @@ class UrbanDictionaryDefinition:
             definition=self._definition.to_protobuf()
         )
 
+    def to_array(self) -> List[any]:
+        return [
+            self._upvotes,
+            self._downvotes,
+            self._word.to_array(),
+            self._definition.to_array()
+        ]
+
     @classmethod
     def from_protobuf(cls, protobuf: UrbanDictionaryDefinitionProto) -> 'UrbanDictionaryDefinition':
         return UrbanDictionaryDefinition(
@@ -38,6 +46,15 @@ class UrbanDictionaryDefinition:
             downvotes=protobuf.downvotes,
             word=SentenceSequence.from_protobuf(protobuf.word),
             definition=SentenceSequence.from_protobuf(protobuf.definition)
+        )
+
+    @classmethod
+    def from_array(cls, arr: List[any]) -> 'UrbanDictionaryDefinition':
+        return UrbanDictionaryDefinition(
+            upvotes=arr[0],
+            downvotes=arr[1],
+            word=SentenceSequence.from_array(arr[2]),
+            definition=SentenceSequence.from_array(arr[3])
         )
 
 
