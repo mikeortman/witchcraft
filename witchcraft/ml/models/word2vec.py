@@ -1,6 +1,7 @@
 from typing import Optional, Dict, List, Tuple, Generator
 import tensorflow as tf
-
+import csv
+from pathlib import Path
 
 from witchcraft.ml.optimizers import Optimizer
 from witchcraft.ml.datasets import WitchcraftDataset
@@ -113,14 +114,10 @@ class Word2VecVocab:
     def get_vocab(self):
         return self._pruned
 
-    def save_metaata(self) -> None:
-        with open("words_" + self._hyperparameters.get_name() + ".tsv", "w") as fout:
-            for word in self._pruned_id_to_word:
-                fout.write(word + "\n")
-
-    def get_skipgrams_for_sequence(self, seq: SentenceSequence) -> List[Tuple[int, int]]:
-        skipgrams = []
-
+    def store_skipgram_for_sequence(self, seq: SentenceSequence, tfrecords_filename: str) -> List[Tuple[int, int]]:
+        skipgrams_source = []
+        skipgrams_target = []
+        writer: tf.python_io.TFRecordWriter = tf.python_io.TFRecordWriter(tfrecords_filename)
         def generate_skipgrams(sentence: List[Optional[int]]) -> Generator[Tuple[int, int], None, None]:
             sentence_size: int = len(sentence)
             window_size: int = self._hyperparameters.get_skipgram_window_size()
@@ -141,10 +138,68 @@ class Word2VecVocab:
         for sentence in seq.get_sentence_generator():
             words = [w.get_word_string_normalized() for w in sentence.get_word_generator() if w.provides_contextual_value()]
             words = [self.word_to_id(w) for w in words]
-            for skipgram in generate_skipgrams(words):
-                skipgrams += [skipgram]
+            for (skipgram_source, skipgram_target) in generate_skipgrams(words):
+                skipgrams_source += [skipgram_source]
+                skipgrams_target += [skipgrams_target]
 
-        return skipgrams
+        skipgrams_source_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgrams_source]))
+        skipgrams_target_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgrams_target]))
+        features = {
+            'train/source': skipgrams_source_feature,
+            'train/target': skipgrams_target_feature
+        }
+
+        example = tf.train.Example(features=tf.train.Features(feature=features))
+        writer.write(example)
+        writer.close()
+
+    def save_to_disk(self) -> None:
+        with open(Word2VecVocab.get_metadata_filename(self._hyperparameters), "w") as fout:
+            fout.write("word\tword_count")
+            for word in self._pruned_id_to_word:
+                fout.write(word + "\t" + str(self._pruned[word]) + "\n")
+
+    @classmethod
+    def get_metadata_filename(cls, hyperparameters: Optional[Word2VecHyperparameters]):
+        if hyperparameters is None:
+            hyperparameters = Word2VecHyperparameters()
+
+        return "words_" + hyperparameters.get_name() + ".tsv"
+
+    @classmethod
+    def load_from_disk(cls, hyperparameters: Optional[Word2VecHyperparameters]) -> Optional['Word2VecVocab']:
+        filename = Word2VecVocab.get_metadata_filename(hyperparameters)
+        if not Path(filename).is_file():
+            return None
+
+        pruned = {}
+        word_to_id = {}
+        id_to_word = []
+        with open(Word2VecVocab.get_metadata_filename(hyperparameters), "r") as fin:
+
+            csv_reader = csv.DictReader(fin, delimiter=',')
+            i = 0
+            on_column_row = True
+            for row in csv_reader:
+                if on_column_row == True:
+                    on_column_row = False
+                    continue # Skip the header
+
+                word = row["word"]
+                word_count = int(row["word_count"])
+                pruned[word] = word_count
+
+                word_to_id[word] = i
+                id_to_word += [word]
+                i += 1
+
+        return Word2VecVocab(
+            hyperparameters=hyperparameters,
+            pruned=pruned,
+            pruned_word_to_id=word_to_id,
+            pruned_id_to_word=id_to_word
+        )
+
 
 class Word2VecVocabBuilder:
     def __init__(self) -> None:

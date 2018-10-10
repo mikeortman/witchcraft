@@ -6,7 +6,7 @@ from witchcraft.nlp.protos.nlpdatatypes_pb2 import Phrase as PhraseProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import Sentence as SentenceProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import SentenceSequence as SentenceSequenceProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordDependency as WordDependencyProto
-
+import tensorflow as tf
 
 class PartOfSpeech:
     def __init__(self, pos: Optional[str] = None) -> None:
@@ -246,6 +246,7 @@ class Sentence:
 
     def to_array(self) -> List[any]:
         return [p.to_array() for p in self.get_phrase_generator()]
+
 
     @classmethod
     def from_protobuf(cls, sentence_proto: SentenceProto) -> 'Sentence':
