@@ -82,6 +82,7 @@ class Word2VecHyperparameters:
     def get_optimizer(self) -> Optimizer:
         return self._optimizer
 
+
 class Word2VecVocab:
     def __init__(self, hyperparameters: Optional[Word2VecHyperparameters],
                  pruned: Dict[str, int],
@@ -114,60 +115,65 @@ class Word2VecVocab:
     def get_vocab(self):
         return self._pruned
 
-    def store_skipgram_for_sequence(self, seq: SentenceSequence, tfrecords_filename: str) -> List[Tuple[int, int]]:
-        skipgrams_source = []
-        skipgrams_target = []
-        writer: tf.python_io.TFRecordWriter = tf.python_io.TFRecordWriter(tfrecords_filename)
-        def generate_skipgrams(sentence: List[Optional[int]]) -> Generator[Tuple[int, int], None, None]:
-            sentence_size: int = len(sentence)
-            window_size: int = self._hyperparameters.get_skipgram_window_size()
+    def store_skipgrams_to_disk(self, seq_gen) -> None:
+        with tf.python_io.TFRecordWriter(self.get_skipgram_record_filename()) as writer:
+            def generate_skipgrams(sentence: List[Optional[int]]) -> Generator[Tuple[int, int], None, None]:
+                sentence_size: int = len(sentence)
+                window_size: int = self._hyperparameters.get_skipgram_window_size()
 
-            for i in range(sentence_size):
-                current_word = sentence[i]
-                if current_word is None:
-                    continue
+                for i in range(sentence_size):
+                    current_word = sentence[i]
+                    if current_word is None:
+                        continue
 
-                for y in range(1, window_size + 1):
-                    if i - y >= 0 and sentence[i - y] is not None:
-                        yield (current_word, sentence[i - y])
+                    for y in range(1, window_size + 1):
+                        if i - y >= 0 and sentence[i - y] is not None:
+                            yield (current_word, sentence[i - y])
 
-                for y in range(1, window_size + 1):
-                    if i + y < sentence_size and sentence[i + y] is not None:
-                            yield (current_word, sentence[i + y])
+                    for y in range(1, window_size + 1):
+                        if i + y < sentence_size and sentence[i + y] is not None:
+                                yield (current_word, sentence[i + y])
 
-        for sentence in seq.get_sentence_generator():
-            words = [w.get_word_string_normalized() for w in sentence.get_word_generator() if w.provides_contextual_value()]
-            words = [self.word_to_id(w) for w in words]
-            for (skipgram_source, skipgram_target) in generate_skipgrams(words):
-                skipgrams_source += [skipgram_source]
-                skipgrams_target += [skipgrams_target]
+            for seq in seq_gen():
+                for sentence in seq.get_sentence_generator():
+                    words = [w.get_word_string_normalized() for w in sentence.get_word_generator() if w.provides_contextual_value()]
+                    words = [self.word_to_id(w) for w in words]
+                    for (skipgram_source, skipgram_target) in generate_skipgrams(words):
+                        skipgrams_source_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgram_source]))
+                        skipgrams_target_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgram_target]))
 
-        skipgrams_source_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgrams_source]))
-        skipgrams_target_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgrams_target]))
-        features = {
-            'train/source': skipgrams_source_feature,
-            'train/target': skipgrams_target_feature
-        }
+                        features = {
+                            's': skipgrams_source_feature,
+                            't': skipgrams_target_feature
+                        }
 
-        example = tf.train.Example(features=tf.train.Features(feature=features))
-        writer.write(example)
-        writer.close()
+                        example = tf.train.Example(features=tf.train.Features(feature=features))
+                        writer.write(example.SerializeToString())
 
-    def save_to_disk(self) -> None:
+    def load_skipgrams_to_dataset(self) -> 'Word2VecSkipgramDataset':
+        return Word2VecSkipgramDataset(self)
+
+    def save_metadata_to_disk(self) -> None:
         with open(Word2VecVocab.get_metadata_filename(self._hyperparameters), "w") as fout:
-            fout.write("word\tword_count")
+            fout.write("word\tword_count\n")
             for word in self._pruned_id_to_word:
                 fout.write(word + "\t" + str(self._pruned[word]) + "\n")
 
     @classmethod
-    def get_metadata_filename(cls, hyperparameters: Optional[Word2VecHyperparameters]):
+    def get_metadata_filename(cls, hyperparameters: Optional[Word2VecHyperparameters]) -> str:
         if hyperparameters is None:
             hyperparameters = Word2VecHyperparameters()
 
         return "words_" + hyperparameters.get_name() + ".tsv"
 
+    def get_skipgram_record_filename(self) -> str:
+        return "skipgrams_" + self._hyperparameters.get_name() + ".tfrecord"
+
+    def to_dataset(self) -> 'Word2VecSkipgramDataset':
+        return Word2VecSkipgramDataset(self)
+
     @classmethod
-    def load_from_disk(cls, hyperparameters: Optional[Word2VecHyperparameters]) -> Optional['Word2VecVocab']:
+    def load_metadata_from_disk(cls, hyperparameters: Optional[Word2VecHyperparameters]) -> Optional['Word2VecVocab']:
         filename = Word2VecVocab.get_metadata_filename(hyperparameters)
         if not Path(filename).is_file():
             return None
@@ -175,18 +181,18 @@ class Word2VecVocab:
         pruned = {}
         word_to_id = {}
         id_to_word = []
-        with open(Word2VecVocab.get_metadata_filename(hyperparameters), "r") as fin:
 
-            csv_reader = csv.DictReader(fin, delimiter=',')
+        with open(Word2VecVocab.get_metadata_filename(hyperparameters), "r") as fin:
             i = 0
             on_column_row = True
-            for row in csv_reader:
+            for line in fin:
                 if on_column_row == True:
                     on_column_row = False
                     continue # Skip the header
 
-                word = row["word"]
-                word_count = int(row["word_count"])
+                row = line.split('\t')
+                word = row[0]
+                word_count = int(row[1])
                 pruned[word] = word_count
 
                 word_to_id[word] = i
@@ -199,6 +205,25 @@ class Word2VecVocab:
             pruned_word_to_id=word_to_id,
             pruned_id_to_word=id_to_word
         )
+
+
+class Word2VecSkipgramDataset(WitchcraftDataset):
+    def __init__(self, vocab: Word2VecVocab) -> None:
+        super(Word2VecSkipgramDataset, self).__init__(tf.data.TFRecordDataset(vocab.get_skipgram_record_filename()))
+        self._vocab = vocab
+
+        def map_entry(entry_proto):
+            features = {
+                's': tf.FixedLenFeature([], tf.int64),
+                't': tf.FixedLenFeature([], tf.int64)
+            }
+            parsed_features = tf.parse_single_example(entry_proto, features)
+            return parsed_features["s"], parsed_features["t"]
+
+        self.map(map_entry)
+
+    def get_vocab(self):
+        return self._vocab
 
 
 class Word2VecVocabBuilder:
@@ -275,9 +300,9 @@ class Word2VecVocabBuilder:
 class Word2VecModel:
     # Classic word2vec model for use with witchcraft
     def __init__(self,
-                 dataset: WitchcraftDataset, #Assumes tuple int pairs.
                  vocab: Word2VecVocab,
                  hyperparameters: Optional[Word2VecHyperparameters] = None) -> None:
+
         if hyperparameters is None:
             hyperparameters = Word2VecHyperparameters()
 
@@ -293,12 +318,15 @@ class Word2VecModel:
             #     output_shapes=(tf.TensorShape([None]), tf.TensorShape([None]))
             # )
 
-            self._dataset = dataset
-            self._dataset = self._dataset.shuffle(buffer_size=500000)
+            self._dataset = vocab.to_dataset()
+            self._dataset = self._dataset.shuffle(shuffle_buffer=500000)
             self._dataset = self._dataset.repeat()
             self._dataset = self._dataset.prefetch(buffer_size=1000000)
+            self._dataset = self._dataset.batch(batch_size=128)
 
             (center_words, target_words) = self._dataset.to_tf_iterator().get_next()
+            print(center_words.shape)
+            print(target_words.shape)
             target_words = tf.expand_dims(target_words, axis=-1)
 
             embedding_size = self._hyperparameters.get_embedding_size()

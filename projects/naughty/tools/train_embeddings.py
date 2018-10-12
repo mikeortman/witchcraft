@@ -5,37 +5,18 @@ import itertools
 
 from witchcraft.util.protobuf import protobufs_from_filestream
 from witchcraft.ml.models.word2vec import Word2VecVocabBuilder, Word2VecVocab, Word2VecHyperparameters, Word2VecModel
-
+from witchcraft.ml.optimizers import WitchcraftMomentumOptimizer
 from projects.naughty.protos.naughty_pb2 import UrbanDictionaryDefinition as UrbanDictionaryDefinitionProto
 from projects.naughty.definition import UrbanDictionaryDefinition
 
 
-from witchcraft.ml.datasets import WitchcraftDatasetFiles
+hyperparameters = Word2VecHyperparameters()\
+    .set_max_vocab_size(10000)\
+    .set_min_word_count(10)\
+    .set_optimizer(WitchcraftMomentumOptimizer(learning_rate=0.05))\
+    .set_name("win")
 
-
-# class NaughtyProtobufDataset(WitchcraftDatasetFiles):
-#     def __init__(self, file_pattern, vocab: Word2VecVocab) -> None:
-#         super(NaughtyProtobufDataset, self).__init__(file_pattern)
-#
-#         def read_flatmap(file_name) -> List[any]:
-#             print("Get: " + str(file_name))
-#             skipgrams = []
-#
-            with open(file_name, 'rb') as fin:
-                for pb_str in protobufs_from_filestream(fin):
-                    pb = UrbanDictionaryDefinitionProto.FromString(pb_str)
-                    definition = UrbanDictionaryDefinition.from_protobuf(pb)
-                    skipgrams += vocab.get_skipgrams_for_sequence(definition.get_definition_sequence())
-#
-#             return skipgrams
-#
-#         self.flat_map(read_flatmap)
-
-
-
-
-hyperparameters = Word2VecHyperparameters().set_max_vocab_size(10000).set_min_word_count(10)
-vocab: Optional[Word2VecVocab] = Word2VecVocab.load_from_disk(hyperparameters=hyperparameters)
+vocab: Optional[Word2VecVocab] = Word2VecVocab.load_metadata_from_disk(hyperparameters=hyperparameters)
 
 def build_wordcount_list_for_file(filename: str) -> List[Dict[str, int]]:
     word_counts: Dict[str, int] = {}
@@ -56,14 +37,6 @@ def build_wordcount_list_for_file(filename: str) -> List[Dict[str, int]]:
 
     return word_counts
 
-def build_dataset_for_file(filename: str) -> None
-    with open(filename, 'rb') as fin:
-        outfilename = filename + ".records"
-        for pb_str in protobufs_from_filestream(fin):
-            pb = UrbanDictionaryDefinitionProto.FromString(pb_str)
-            definition = UrbanDictionaryDefinition.from_protobuf(pb)
-            vocab
-
 
 if vocab is None:
     print ("Vocab hasn't been built yet. Building.")
@@ -78,17 +51,30 @@ if vocab is None:
         hyperparameters=hyperparameters
     )
 
-    vocab.save_to_disk()
-
-    ## Build TFRecords.
-
+    i = 0
+    vocab.save_metadata_to_disk()
 
 
+    def gen_seqs():
+        i = 0
+        for filename in argv[1:]:
+            with open(filename, 'rb') as fin:
+                print ("Now on: " +str(filename))
+                for pb_str in protobufs_from_filestream(fin):
+                    pb = UrbanDictionaryDefinitionProto.FromString(pb_str)
+                    definition = UrbanDictionaryDefinition.from_protobuf(pb)
+                    yield definition.get_definition_sequence()
+                    yield definition.get_word_sequence()
 
-# dataset: NaughtyProtobufDataset = NaughtyProtobufDataset(file_pattern="*.protobuf", vocab=vocab)
+                    i += 1
+                    if i % 100 == 0:
+                        print("Parsed to skipgrams: " + str(i))
 
+    vocab.store_skipgrams_to_disk(gen_seqs)
+
+
+print("Done... loading model.")
 model: Word2VecModel = Word2VecModel(
-    dataset=dataset,
     vocab=vocab,
     hyperparameters=hyperparameters
 )
@@ -96,6 +82,9 @@ model: Word2VecModel = Word2VecModel(
 print("Training")
 for i in range(100000):
     model.train(i)
+
+    if i % 1000 == 0:
+        print (str(i * 128))
 
 # for filename in argv[1:]:
 #     with open(filename, 'rb') as fin:

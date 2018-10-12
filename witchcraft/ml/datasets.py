@@ -3,8 +3,8 @@ import tensorflow as tf
 
 
 class WitchcraftDataset:
-    def __init__(self, tf_dataset_base: tf.data.Dataset) -> None:
-        self._current_dataset: tf.data.Dataset = tf_dataset_base
+    def __init__(self, tf_dataset_base) -> None:
+        self._current_dataset = tf_dataset_base
 
     def flat_map(self, mapper: Callable[[any], List[any]]) -> 'WitchcraftDataset':
         self._current_dataset = self._current_dataset.flat_map(mapper)
@@ -36,8 +36,3 @@ class WitchcraftDataset:
     @classmethod
     def from_files(cls, file_pattern: str) -> 'WitchcraftDataset':
         return WitchcraftDatasetFiles(file_pattern)
-
-
-class WitchcraftDatasetFiles(WitchcraftDataset):
-    def __init__(self, file_pattern: str, shuffle: bool = False) -> None:
-        super(WitchcraftDatasetFiles, self).__init__(tf.data.Dataset.list_files(file_pattern, shuffle=shuffle))
