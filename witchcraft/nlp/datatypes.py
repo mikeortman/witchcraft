@@ -6,7 +6,9 @@ from witchcraft.nlp.protos.nlpdatatypes_pb2 import Phrase as PhraseProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import Sentence as SentenceProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import SentenceSequence as SentenceSequenceProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordDependency as WordDependencyProto
+from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordEmbedding as WordEmbeddingProto
 import tensorflow as tf
+import numpy as np
 
 class PartOfSpeech:
     def __init__(self, pos: Optional[str] = None) -> None:
@@ -296,4 +298,22 @@ class SentenceSequence:
     def from_array(cls, arr: List[any]) -> 'SentenceSequence':
         return SentenceSequence(
             sentences=[Sentence.from_array(s) for s in arr]
+        )
+
+class WordEmbedding:
+    def __init__(self, word: str, embedding: List[float]):
+        self._word = word
+        self._embedding = np.array(embedding)
+
+    def get_word(self) -> str:
+        return self._word
+
+    def get_embedding(self) -> np.array:
+        return self._embedding
+
+    @classmethod
+    def from_protobuf(cls, word_embedding_proto: WordEmbeddingProto) -> 'WordEmbedding':
+        return WordEmbedding(
+            word_embedding_proto.word,
+            word_embedding_proto.embeddingVector
         )

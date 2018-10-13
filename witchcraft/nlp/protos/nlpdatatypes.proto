@@ -34,3 +34,9 @@ message Sentence {
 message SentenceSequence {
   repeated Sentence sentences = 1;
 }
+
+message WordEmbedding {
+    required string word = 1;
+    repeated double embeddingVector = 2;
+}
+

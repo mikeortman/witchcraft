@@ -5,15 +5,17 @@ import itertools
 
 from witchcraft.util.protobuf import protobufs_from_filestream
 from witchcraft.ml.models.word2vec import Word2VecVocabBuilder, Word2VecVocab, Word2VecHyperparameters, Word2VecModel
-from witchcraft.ml.optimizers import WitchcraftMomentumOptimizer
+from witchcraft.ml.optimizers import WitchcraftAdagradOptimizer
 from projects.naughty.protos.naughty_pb2 import UrbanDictionaryDefinition as UrbanDictionaryDefinitionProto
 from projects.naughty.definition import UrbanDictionaryDefinition
 
 
 hyperparameters = Word2VecHyperparameters()\
-    .set_max_vocab_size(10000)\
-    .set_min_word_count(10)\
-    .set_optimizer(WitchcraftMomentumOptimizer(learning_rate=0.05))\
+    .set_max_vocab_size(20000)\
+    .set_min_word_count(15)\
+    .set_optimizer(WitchcraftAdagradOptimizer(learning_rate=0.75))\
+    .set_batch_size(64)\
+    .set_negative_sample_count(64)\
     .set_name("win")
 
 vocab: Optional[Word2VecVocab] = Word2VecVocab.load_metadata_from_disk(hyperparameters=hyperparameters)
@@ -80,11 +82,16 @@ model: Word2VecModel = Word2VecModel(
 )
 
 print("Training")
-for i in range(100000):
+i = 0
+while True:
     model.train(i)
+    i += 1
 
     if i % 1000 == 0:
         print (str(i * 128))
+
+    if i % 100000 == 0:
+        model.save_embeddings("win_" + str(i) + ".embeddings")
 
 # for filename in argv[1:]:
 #     with open(filename, 'rb') as fin:

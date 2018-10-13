@@ -10,8 +10,8 @@ class WitchcraftDataset:
         self._current_dataset = self._current_dataset.flat_map(mapper)
         return self
 
-    def map(self, mapper: Callable[[any], any]) -> 'WitchcraftDataset':
-        self._current_dataset = self._current_dataset.map(mapper)
+    def map(self, mapper: Callable[[any], any], num_parallel_calls: int = 1) -> 'WitchcraftDataset':
+        self._current_dataset = self._current_dataset.map(mapper, num_parallel_calls=num_parallel_calls)
         return self
 
     def batch(self, batch_size: int) -> 'WitchcraftDataset':
@@ -28,6 +28,10 @@ class WitchcraftDataset:
 
     def prefetch(self, buffer_size: int) -> 'WitchcraftDataset':
         self._current_dataset = self._current_dataset.prefetch(buffer_size)
+        return self
+
+    def cache(self) -> 'WitchcraftDataset':
+        self._current_dataset = self._current_dataset.cache()
         return self
 
     def to_tf_iterator(self) -> tf.data.Iterator:
