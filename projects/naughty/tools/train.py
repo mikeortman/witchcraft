@@ -11,7 +11,7 @@ from projects.naughty.definition import UrbanDictionaryDefinition
 
 
 hyperparameters = Word2VecHyperparameters()\
-    .set_max_vocab_size(20000)\
+    .set_max_vocab_size(25000)\
     .set_min_word_count(15)\
     .set_optimizer(WitchcraftAdagradOptimizer(learning_rate=0.75))\
     .set_batch_size(64)\
