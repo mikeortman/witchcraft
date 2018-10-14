@@ -303,12 +303,12 @@ class SentenceSequence:
 class WordEmbedding:
     def __init__(self, word: str, embedding: List[float]):
         self._word = word
-        self._embedding = np.array(embedding)
+        self._embedding = list(embedding)
 
     def get_word(self) -> str:
         return self._word
 
-    def get_embedding(self) -> np.array:
+    def get_embedding(self) -> List[float]:
         return self._embedding
 
     @classmethod
