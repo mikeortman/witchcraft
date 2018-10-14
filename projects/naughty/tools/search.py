@@ -3,12 +3,13 @@
 from witchcraft.util.protobuf import protobufs_from_filestream
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordEmbedding as WordEmbeddingProto
 from witchcraft.nlp.datatypes import WordEmbedding
+from witchcraft.nlp.parse import Parser
 
+from flask import Flask, request, jsonify
 import tensorflow as tf
 from sys import argv
 
 
-from flask import Flask
 app = Flask(__name__)
 
 embeddingMatrix = []
@@ -40,76 +41,66 @@ searchDotProduct = tf.reduce_sum(tf.expand_dims(searchEmbeddings, axis=1) * embe
 cosineSim = searchDotProduct / embeddingsNormal / tf.expand_dims(searchEmbeddingsNormal, axis=-1)
 topTenVals, topTenIdx = tf.nn.top_k(cosineSim, k=10, sorted=True)
 
-
-print("search word indexes: " + str(searchWordIndexes.shape))
-print("search embeddings: " + str(searchEmbeddings.shape))
-print("search normal: " + str(searchEmbeddingsNormal.shape))
-print("embeddings model: " + str(embeddingsModel.shape))
-print("embeddings normal: " + str(embeddingsNormal.shape))
-print("dot product: " + str(searchDotProduct.shape))
-print("cosim: " + str(cosineSim.shape))
-print("topten: " + str(topTenVals.shape) + ", " + str(topTenIdx.shape))
-
 session = tf.Session()
 
-
-@app.route('/')
+@app.route('/search')
 def home():
-    print("running.")
-    words = [s for s in argv[2:] if s in embeddingToId]
-    wordsIdx = [embeddingToId[i] for i in words]
-    foundIdx = session.run(topTenIdx, {searchWordIndexes: wordsIdx})
+    source_text = request.args.get('text')
 
-    for wordIndexes in foundIdx:
-        print("Word:")
-        print("Found: " + str([idToEmbedding[r] for r in wordIndexes]))
-    return 'Done'
+    sentenceSequence = Parser.parse_string_to_sentence_sequence(source_text)
 
-app.run(debug=True)
+    wordsToLookup = [s.get_word_string_normalized() for s in sentenceSequence.get_word_generator() if s.get_word_string_normalized() in embeddingToId]
+    wordsToLookupIdx = [embeddingToId[i] for i in wordsToLookup]
+    foundIdx, foundStrength = session.run([topTenIdx, topTenVals], {searchWordIndexes: wordsToLookupIdx})
 
-# print(cosineSim.shape)
-# print(searchDotProduct.shape)
-# print(embeddingsModel.shape)
-# print(tf.expand_dims(embeddingsNormal, axis=-1).shape)
-# print(searchEmbeddings.shape)
-# print(tf.expand_dims(searchEmbeddingsNormal, axis=-1).shape)
+    foundWordMatches = {}
+    for i in range(len(wordsToLookup)):
+        word = wordsToLookup[i]
+        wordSimilar = [idToEmbedding[x] for x in foundIdx[i]]
+        wordSimilarStrength = foundStrength[i]
+        wordDict = {
+            'word': word,
+            'similar': []
+        }
+
+        for y in range(len(wordSimilar)):
+            wordDict['similar'] += [{
+                'word': wordSimilar[y],
+                'strength': float(wordSimilarStrength[y])
+            }]
+
+        foundWordMatches[word] = wordDict
+
+    responseJson = {
+        'source_text': source_text,
+        'sentences': []
+    }
+
+
+    for sentence in sentenceSequence.get_sentence_generator():
+        print(sentence)
+        sentenceJson = {
+            'sentence_text': str(sentence),
+            'words': []
+        }
 
 
 
-# embeddings = {}
-# with open(argv[1], 'rb') as fin:
-#     for pb_str in protobufs_from_filestream(fin):
-#         pb: WordEmbeddingProto = WordEmbeddingProto.FromString(pb_str)
-#         embedding: WordEmbedding = WordEmbedding.from_protobuf(pb)
-#         embeddings[embedding.get_word()] = embedding.get_embedding()
-#
-# print("Done. Loaded " + str(len(embeddings)) + " embeddings.")
+        words = [s for s in argv[2:] if s in embeddingToId]
+        wordsIdx = [embeddingToId[i] for i in words]
+        foundIdx = session.run(topTenIdx, {searchWordIndexes: wordsIdx})
 
+        for word in sentence.get_word_generator():
+            wordNorm = word.get_word_string_normalized()
+            if wordNorm in foundWordMatches:
+                sentenceJson['words'] += [foundWordMatches[wordNorm]]
+            else:
+                sentenceJson['words'] += [{
+                    'word': wordNorm
+                }]
 
-# def search(search_word: str):
-#     search_embedding = embeddings[search_word]
-#     denom_search = np.sqrt(np.sum(np.multiply(search_embedding, search_embedding)))
-#     calculated_distance = []
-#     for test_word, test_embedding in embeddings.items():
-#         num = np.sum(np.multiply(search_embedding, test_embedding))
-#         denom_test = np.sqrt(np.sum(np.multiply(test_embedding, test_embedding)))
-#         sim = num / denom_search / denom_test
-#
-#         calculated_distance += [(test_word, sim)]
-#
-#     calculated_distance.sort(key=lambda a: -a[1])
-#     return calculated_distance[:10]
-#
-#
-# def print_search(search_word: str):
-#     print(search_word)
-#     for (word, distance) in search(search_word):
-#         print("\t" + word + ": " + str(distance))
-#
-#     print("")
-#     print("")
-#
-#
-# for word in argv[2:]:
-#     print_search(word)
+        responseJson['sentences'] += [sentenceJson]
 
+    return jsonify(responseJson)
+
+app.run(host="0.0.0.0", debug=False)
