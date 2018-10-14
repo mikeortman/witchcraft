@@ -84,12 +84,6 @@ def home():
             'words': []
         }
 
-
-
-        words = [s for s in argv[2:] if s in embeddingToId]
-        wordsIdx = [embeddingToId[i] for i in words]
-        foundIdx = session.run(topTenIdx, {searchWordIndexes: wordsIdx})
-
         for word in sentence.get_word_generator():
             wordNorm = word.get_word_string_normalized()
             if wordNorm in foundWordMatches:
