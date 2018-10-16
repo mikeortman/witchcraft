@@ -6,6 +6,7 @@ from pathlib import Path
 from witchcraft.ml.optimizers import Optimizer
 from witchcraft.ml.datasets import WitchcraftDataset
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordEmbedding as WordEmbeddingProto
+from witchcraft.nlp.parse import Parser
 from witchcraft.util.protobuf import protobuf_to_filestream
 
 class Word2VecHyperparameters:
@@ -20,6 +21,7 @@ class Word2VecHyperparameters:
         self._optimizer: Optimizer = Optimizer()
         self._name: Optional[str] = None
         self._record_file_size: int = 100000
+        self._cluster_bigram_mincount: Optional[int] = None
 
     def set_embedding_size(self, embedding_size: int) -> 'Word2VecHyperparameters':
         self._embedding_size = embedding_size
@@ -91,6 +93,13 @@ class Word2VecHyperparameters:
     def get_record_file_size(self) -> int:
         return self._record_file_size
 
+    def enable_bigram_with_mincount(self, min_count: int) -> 'Word2VecHyperparameters':
+        self._cluster_bigram_mincount = min_count
+        return self
+
+    def get_bigram_mincount(self) -> Optional[int]:
+        return self._cluster_bigram_mincount
+
 
 class Word2VecVocab:
     def __init__(self, hyperparameters: Optional[Word2VecHyperparameters],
@@ -151,9 +160,9 @@ class Word2VecVocab:
 
         for seq in seq_gen():
             for sentence in seq.get_sentence_generator():
-                words = [w.get_word_string_normalized() for w in sentence.get_word_generator() if w.provides_contextual_value()]
-                words = [self.word_to_id(w) for w in words]
-                for (skipgram_source, skipgram_target) in generate_skipgrams(words):
+                phrases = [p.to_phrase_normalized() for p in sentence.get_phrase_generator() if p.provides_contextual_value()]
+                phrases = [self.word_to_id(p) for p in phrases]
+                for (skipgram_source, skipgram_target) in generate_skipgrams(phrases):
                     skipgrams_source_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgram_source]))
                     skipgrams_target_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgram_target]))
 
@@ -275,17 +284,26 @@ class Word2VecVocabBuilder:
         self._vocab[word] += count
         self._last_built_vocab = None #Invalidate the build vocab
 
-    def build(self, hyperparameters: Optional[Word2VecHyperparameters] = None) -> Word2VecVocab:
+    def build_and_save(self, sentence_sequence_generator,  hyperparameters: Optional[Word2VecHyperparameters] = None) -> Word2VecVocab:
         if hyperparameters is None:
             hyperparameters = Word2VecHyperparameters()
+
+        sentence_sequence_generator = Parser.create_cached_sentence_sequence_generator(sentence_sequence_generator)
+        bigram_mincount = hyperparameters.get_bigram_mincount()
+        if bigram_mincount is not None:
+            # Bigram clustering is enabled.
+            print("Bigramming is enabled to " + str(bigram_mincount))
+            sentence_sequence_generator = Parser.cluster_phrases_with_minimum_appearance(sentence_sequence_generator, bigram_mincount)
+
+        for sequence in sentence_sequence_generator():
+            for phrase in sequence.get_phrase_generator():
+                self.add_word_count_to_vocab(phrase.to_phrase_normalized(), 1)
 
         if self._last_built_vocab is not None:
             return self._last_built_vocab
 
         pruned = [(k,v) for k,v in self._vocab.items() if v >= hyperparameters.get_min_word_count()]
         pruned.sort(key=lambda x: -x[1])
-
-
 
         # Subsampling
         # if hyperparameters.get_subsampling_threshold() is not None:
@@ -307,7 +325,6 @@ class Word2VecVocabBuilder:
         #     tokenCounts = tokensToKeep
         # else:
         #     log.info("Subsampling disabled.")
-
 
         max_vocab_size = hyperparameters.get_max_vocab_size()
         if max_vocab_size is not None:
@@ -331,6 +348,8 @@ class Word2VecVocabBuilder:
             pruned_id_to_word=pruned_id_to_word
         )
 
+        self._last_built_vocab.save_metadata_to_disk()
+        self._last_built_vocab.store_skipgrams_to_disk(sentence_sequence_generator)
         return self._last_built_vocab
 
 

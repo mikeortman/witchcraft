@@ -199,6 +199,9 @@ class Phrase:
             [w.get_word_string() + w.get_whitespace_postfix() for w in self.get_word_generator()]
         )
 
+    def to_phrase_normalized(self):
+        return ' '.join([w.get_word_string_normalized() for w in self.get_word_generator()])
+
     def to_protobuf(self) -> PhraseProto:
         return PhraseProto(
             words=[w.to_protobuf() for w in self.get_word_generator()]
@@ -223,6 +226,10 @@ class Phrase:
         return Phrase(
             words=[Word.from_array(w) for w in arr]
         )
+
+    @classmethod
+    def merge_two_phrases(cls, first: 'Phrase', second: 'Phrase') -> 'Phrase':
+        return Phrase(list(first.get_word_generator()) + list(second.get_word_generator()))
 
 
 class Sentence:
@@ -278,6 +285,9 @@ class SentenceSequence:
         for sentence in self._sentences:
             for word in sentence.get_word_generator():
                 yield word
+
+    def get_sequence_generator(self) -> Generator['SentenceSequence', None, None]:
+        yield self
 
     def __str__(self) -> str:
         return ''.join([str(s) for s in self.get_sentence_generator()])
