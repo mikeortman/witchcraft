@@ -297,6 +297,9 @@ class Word2VecVocabBuilder:
 
         for sequence in sentence_sequence_generator():
             for phrase in sequence.get_phrase_generator():
+                if not phrase.provides_contextual_value():
+                    continue
+                    
                 self.add_word_count_to_vocab(phrase.to_phrase_normalized(), 1)
 
         if self._last_built_vocab is not None:
