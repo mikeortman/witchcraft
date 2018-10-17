@@ -12,12 +12,12 @@ from witchcraft.nlp.parse import Parser
 
 
 hyperparameters = Word2VecHyperparameters()\
-    .set_max_vocab_size(25000)\
+    .set_max_vocab_size(30000)\
     .set_min_word_count(15)\
     .set_optimizer(WitchcraftAdagradOptimizer(learning_rate=0.75))\
     .set_batch_size(64)\
     .set_negative_sample_count(64)\
-    .enable_ngram(min_count=75, max_ngram_size=4)\
+    .enable_ngram(min_count=100, max_ngram_size=4)\
     .set_name("win")
 
 vocab: Optional[Word2VecVocab] = Word2VecVocab.load_metadata_from_disk(hyperparameters=hyperparameters)
