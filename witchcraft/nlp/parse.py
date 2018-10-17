@@ -24,7 +24,7 @@ class SpacyInstance:
 class Parser:
 
     @staticmethod
-    def create_cached_sentence_sequence_generator(src_generator):
+    def cached_sentence_sequence_generator(src_generator):
         cached = list(src_generator())
 
         def cached_gen():
@@ -70,72 +70,78 @@ class Parser:
         return SentenceSequence(sentences=sentences)
 
     @staticmethod
-    def cluster_phrases_with_minimum_appearance(sentence_sequences: Callable[[], Generator[SentenceSequence, None, None]], min_appearances:int) -> Generator[SentenceSequence, None, None]:
-        # This method does phrase cluster.
+    def cluster_phrases(sentence_sequences: Callable[[], Generator[SentenceSequence, None, None]], max_ngram: int, min_appear: int) -> Generator[SentenceSequence, None, None]:
+        # This method does phrase clustering up to max_ngram sizes, starting at largest ngram.
+        # Requires an ngram to appear min_appear times before it would cluster on that.
         # First pass will count frequency of adjacent phrases
         # Second pass will do the grouping on a first-come (LTR) basis on phrases meeting requirements
         # Not recommended for very large corpuses right now, but good for most.
         # Not recommended for multiple times unnecessarily
-        def gen():
-            phrase_combo_frequency = {}
+        def ngramed_sequence_gen(sequence_gen, ngram_size):
+            def gen():
+                phrase_combo_frequency = {}
+                for sentence_sequence in sequence_gen():
+                    for sentence in sentence_sequence.get_sentence_generator():
+                        phrases = list(sentence.get_phrase_generator())
+                        for x in range(len(phrases) - ngram_size + 1):
+                            phrases_current_ngram = phrases[x:x+ngram_size]
+                            passing_phrases = [p for p in phrases_current_ngram if p.provides_contextual_value() and p.is_word()]
+                            if len(phrases_current_ngram) != len(passing_phrases):
+                                continue  # Not all items provide contextual value
 
-            for sentence_sequence in sentence_sequences():
-                for sentence in sentence_sequence.get_sentence_generator():
-                    phrases = list(sentence.get_phrase_generator())
-                    for i in range(len(phrases) - 1):
-                        first = phrases[i]
-                        second = phrases[i+1]
+                            combo = Phrase.merge_phrases(phrases_current_ngram).to_phrase_normalized()
+                            if combo not in phrase_combo_frequency:
+                                phrase_combo_frequency[combo] = 0
 
-                        if not first.provides_contextual_value() or not second.provides_contextual_value():
-                            continue
+                            phrase_combo_frequency[combo] += 1
 
-                        combo = Phrase.merge_two_phrases(first, second).to_phrase_normalized()
-                        if combo not in phrase_combo_frequency:
-                            phrase_combo_frequency[combo] = 0
+                phrases_meeting_requirements = {k: v for k, v in phrase_combo_frequency.items() if v >= min_appear}
+                print(phrases_meeting_requirements)
 
-                        phrase_combo_frequency[combo] += 1
+                # Second pass, do the grouping.
+                for sentence_sequence in sequence_gen():
+                    new_sequence_sentences = []
+                    for sentence in sentence_sequence.get_sentence_generator():
+                        # print("Running phrase merge on " + str(sentence))
+                        phrases = list(sentence.get_phrase_generator())
+                        # print ("Got phrases: " + str(phrases))
 
-            phrases_meeting_requirements = {k: v for k, v in phrase_combo_frequency.items() if v >= min_appearances}
+                        merged_phrases = []
+                        x = 0
+                        while x < len(phrases) - ngram_size + 1:
+                            phrases_current_ngram = phrases[x:x+ngram_size]
+                            # print("Testing on " + str([p.to_phrase_normalized() for p in phrases_current_ngram]))
 
-            print(phrases_meeting_requirements)
+                            passing_phrases = [p for p in phrases_current_ngram if p.provides_contextual_value() and p.is_word()]
+                            if len(phrases_current_ngram) != len(passing_phrases):
+                                merged_phrases += [phrases_current_ngram[0]]
+                                x += 1
+                                continue
 
-            # Second pass, do the grouping.
-            for sentence_sequence in sentence_sequences():
-                new_sequence_sentences = []
-                for sentence in sentence_sequence.get_sentence_generator():
-                    # print("Running phrase merge on " + str(sentence))
-                    phrases = list(sentence.get_phrase_generator())
-                    # print ("Got phrases: " + str(phrases))
+                            combo = Phrase.merge_phrases(phrases_current_ngram)
+                            combo_str = combo.to_phrase_normalized()
+                            if combo_str in phrases_meeting_requirements:
+                                merged_phrases += [combo]
+                                x += ngram_size
+                            else:
+                                merged_phrases += [phrases_current_ngram[0]]
+                                x += 1
 
-                    merged_phrases = []
-                    i = 0
-                    while i < len(phrases) - 1:
-                        first = phrases[i]
-                        second = phrases[i+1]
-                        # print("Testing on " + str(first) + " and " + str(second))
+                        # Edge case where the last ngram will not become a phrase
+                        if x == len(phrases) - ngram_size + 1:
+                            # print("TEST EDGE CASE: " + str(x) + "; LEN: " + str(len(phrases)) + "; NGRAM: " + str(ngram_size))
+                            merged_phrases += phrases[x:]
 
-                        if not first.provides_contextual_value() or not second.provides_contextual_value():
-                            merged_phrases += [first]
-                            i += 1
-                            continue
+                        new_sentence = Sentence(merged_phrases)
+                        new_sequence_sentences += [new_sentence]
 
-                        merged_phrase = Phrase.merge_two_phrases(first, second)
-                        combo_str = merged_phrase.to_phrase_normalized()
-                        if combo_str in phrases_meeting_requirements:
-                            merged_phrases += [merged_phrase]
-                            i += 2
-                        else:
-                            merged_phrases += [first]
-                            i += 1
+                    # print("Yielding: " + str(new_sequence_sentences))
+                    yield SentenceSequence(new_sequence_sentences)
+            return gen
 
-                    # Edge case where the last two words will not become a phrase
-                    if i == len(phrases) - 1:
-                        merged_phrases += [phrases[i]]
+        current_sequence_gen = sentence_sequences
+        for i in range(max_ngram-1): #3 -> 0,1. Runs gen on 3, then 2
+            current_sequence_gen = ngramed_sequence_gen(current_sequence_gen, max_ngram - i)
+            current_sequence_gen = Parser.cached_sentence_sequence_generator(current_sequence_gen)
 
-                    new_sentence = Sentence(merged_phrases)
-                    # print("Merged: " + str(merged_phrases))
-                    new_sequence_sentences += [new_sentence]
-
-                # print("Yielding: " + str(new_sequence_sentences))
-                yield SentenceSequence(new_sequence_sentences)
-        return gen
+        return current_sequence_gen

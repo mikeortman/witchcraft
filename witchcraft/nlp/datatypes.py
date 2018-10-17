@@ -207,6 +207,9 @@ class Phrase:
             words=[w.to_protobuf() for w in self.get_word_generator()]
         )
 
+    def is_word(self):
+        return len(self._words) == 1
+
     def to_array(self) -> List[any]:
         return [w.to_array() for w in self.get_word_generator()]
 
@@ -228,8 +231,12 @@ class Phrase:
         )
 
     @classmethod
-    def merge_two_phrases(cls, first: 'Phrase', second: 'Phrase') -> 'Phrase':
-        return Phrase(list(first.get_word_generator()) + list(second.get_word_generator()))
+    def merge_phrases(cls, phrases: List['Phrase']) -> 'Phrase':
+        words = []
+        for phrase in phrases:
+            words += list(phrase.get_word_generator())
+
+        return Phrase(words)
 
 
 class Sentence:

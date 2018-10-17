@@ -21,7 +21,8 @@ class Word2VecHyperparameters:
         self._optimizer: Optimizer = Optimizer()
         self._name: Optional[str] = None
         self._record_file_size: int = 100000
-        self._cluster_bigram_mincount: Optional[int] = None
+        self._cluster_ngram_mincount: Optional[int] = None
+        self._cluster_ngram_max_size: int = 1
 
     def set_embedding_size(self, embedding_size: int) -> 'Word2VecHyperparameters':
         self._embedding_size = embedding_size
@@ -93,12 +94,17 @@ class Word2VecHyperparameters:
     def get_record_file_size(self) -> int:
         return self._record_file_size
 
-    def enable_bigram_with_mincount(self, min_count: int) -> 'Word2VecHyperparameters':
-        self._cluster_bigram_mincount = min_count
+    def enable_ngram(self, min_count: int, max_ngram_size: int) -> 'Word2VecHyperparameters':
+        self._cluster_ngram_mincount = min_count
+        self._cluster_ngram_max_size = max_ngram_size
         return self
 
-    def get_bigram_mincount(self) -> Optional[int]:
-        return self._cluster_bigram_mincount
+    def get_ngram_mincount(self) -> Optional[int]:
+        return self._cluster_ngram_mincount
+
+
+    def get_ngram_max_size(self) -> int:
+        return self._cluster_ngram_max_size
 
 
 class Word2VecVocab:
@@ -288,18 +294,20 @@ class Word2VecVocabBuilder:
         if hyperparameters is None:
             hyperparameters = Word2VecHyperparameters()
 
-        sentence_sequence_generator = Parser.create_cached_sentence_sequence_generator(sentence_sequence_generator)
-        bigram_mincount = hyperparameters.get_bigram_mincount()
-        if bigram_mincount is not None:
+        sentence_sequence_generator = Parser.cached_sentence_sequence_generator(sentence_sequence_generator)
+        ngram_mincount = hyperparameters.get_ngram_mincount()
+        ngram_maxsize = hyperparameters.get_ngram_max_size()
+        if ngram_mincount is not None:
             # Bigram clustering is enabled.
-            print("Bigramming is enabled to " + str(bigram_mincount))
-            sentence_sequence_generator = Parser.cluster_phrases_with_minimum_appearance(sentence_sequence_generator, bigram_mincount)
+            print("Ngramming is enabled to " + str(ngram_maxsize) + "-gram with min count " + str(ngram_mincount))
+            sentence_sequence_generator = Parser.cluster_phrases(sentence_sequence_generator, ngram_maxsize, ngram_mincount)
+            sentence_sequence_generator = Parser.cached_sentence_sequence_generator(sentence_sequence_generator)
 
         for sequence in sentence_sequence_generator():
             for phrase in sequence.get_phrase_generator():
                 if not phrase.provides_contextual_value():
                     continue
-                    
+
                 self.add_word_count_to_vocab(phrase.to_phrase_normalized(), 1)
 
         if self._last_built_vocab is not None:
