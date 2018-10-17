@@ -12,7 +12,7 @@ from witchcraft.nlp.parse import Parser
 
 
 hyperparameters = Word2VecHyperparameters()\
-    .set_max_vocab_size(35000)\
+    .set_max_vocab_size(45000)\
     .set_min_word_count(10)\
     .set_optimizer(WitchcraftAdagradOptimizer(learning_rate=0.75))\
     .set_batch_size(64)\
