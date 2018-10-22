@@ -3,40 +3,46 @@ import re
 import csv
 
 from projects.naughty.protos.naughty_pb2 import UrbanDictionaryDefinition as UrbanDictionaryDefinitionProto
-from witchcraft.nlp.parse import Parser
-from witchcraft.nlp.datatypes import SentenceSequence
+from witchcraft.nlp.parse import parse_string_to_document
+from witchcraft.nlp.datatypes import Document
 
 
 class UrbanDictionaryDefinition:
-    def __init__(self, upvotes: int, downvotes: int, word: SentenceSequence, definition: SentenceSequence) -> None:
-        self._upvotes = upvotes
-        self._downvotes = downvotes
-        self._word = word
-        self._definition = definition
+    def __init__(self, upvotes: int, downvotes: int, word: Document, definition: Document) -> None:
+        self._upvotes: int = upvotes
+        self._downvotes: int = downvotes
+        self._word: Document = word
+        self._definition: Document = definition
 
-    def get_word_sequence(self):
+    def get_word(self) -> Document:
         return self._word
 
-    def get_definition_sequence(self):
+    def get_definition(self) -> Document:
         return self._definition
 
+    def get_upvotes(self) -> int:
+        return self._upvotes
+
+    def get_downvotes(self) -> int:
+        return self._downvotes
+
     def __str__(self):
-        return str(self.get_word_sequence())
+        return str(self.get_word())
 
     def to_protobuf(self):
         return UrbanDictionaryDefinitionProto(
             upvotes=self._upvotes,
             downvotes=self._downvotes,
-            word=self._word.to_protobuf(),
-            definition=self._definition.to_protobuf()
+            word=self.get_word().to_protobuf(),
+            definition=self.get_definition().to_protobuf()
         )
 
     def to_array(self) -> List[any]:
         return [
-            self._upvotes,
-            self._downvotes,
-            self._word.to_array(),
-            self._definition.to_array()
+            self.get_upvotes(),
+            self.get_downvotes(),
+            self.get_word().to_array(),
+            self.get_definition().to_array()
         ]
 
     @classmethod
@@ -44,8 +50,8 @@ class UrbanDictionaryDefinition:
         return UrbanDictionaryDefinition(
             upvotes=protobuf.upvotes,
             downvotes=protobuf.downvotes,
-            word=SentenceSequence.from_protobuf(protobuf.word),
-            definition=SentenceSequence.from_protobuf(protobuf.definition)
+            word=Document.from_protobuf(protobuf.word),
+            definition=Document.from_protobuf(protobuf.definition)
         )
 
     @classmethod
@@ -53,8 +59,8 @@ class UrbanDictionaryDefinition:
         return UrbanDictionaryDefinition(
             upvotes=arr[0],
             downvotes=arr[1],
-            word=SentenceSequence.from_array(arr[2]),
-            definition=SentenceSequence.from_array(arr[3])
+            word=Document.from_array(arr[2]),
+            definition=Document.from_array(arr[3])
         )
 
 
@@ -76,7 +82,7 @@ def clean_definition_string(str_in: str) -> str:
 
         str_in = ''.join(new_str)
 
-        str_in = re.sub(r"^(?:#?[0-9a-z]{1,2} *(?:->|=>|-|\.|\)|,)+|\-+) *", "", str_in)  # Remove list ordinals.
+        str_in = re.sub(r"^(?:#?[0-9a-z]{1,2} *(?:->|=>|-|\.|\)|,)+|-+) *", "", str_in)  # Remove list ordinals.
         str_in = re.sub(r"[\\[\]]", "", str_in)  # Remove brackets.
         str_in = re.sub(r"\\*", "", str_in)  # Remove asteriks
         str_in = re.sub(r"\\~", "", str_in)  # Remove tildes
@@ -84,7 +90,7 @@ def clean_definition_string(str_in: str) -> str:
 
         # Remove pos markers
         str_in = re.sub(
-            r"^(?:[(\[]?(?:noun|n|verb|v|adverb|adv|av|adjective|adj|aj)[\.,;]*[)\].]*[^a-z\n])+",
+            r"^(?:[(\[]?(?:noun|n|verb|v|adverb|adv|av|adjective|adj|aj)[.,;]*[)\].]*[^a-z\n])+",
             "",
             str_in
         )
@@ -140,8 +146,8 @@ def generate_definitions_from_csv(input_csv_iter: Iterable) -> Generator[UrbanDi
         definition_lines = [clean_definition_string(d) for d in definition_lines]
         definition = '\n'.join([d for d in definition_lines if d != ""])
 
-        word_parsed: SentenceSequence = Parser.parse_string_to_sentence_sequence(word)
-        definition_parsed: SentenceSequence = Parser.parse_string_to_sentence_sequence(definition)
+        word_parsed: Document = parse_string_to_document(word)
+        definition_parsed: Document = parse_string_to_document(definition)
 
         yield UrbanDictionaryDefinition(
             upvotes=upvotes,

@@ -2,8 +2,8 @@ syntax = "proto2";
 import 'witchcraft/nlp/protos/nlpdatatypes.proto';
 
 message UrbanDictionaryDefinition {
-    required witchcraft.SentenceSequence word = 1;
-    required witchcraft.SentenceSequence definition = 2;
+    required witchcraft.Document word = 1;
+    required witchcraft.Document definition = 2;
     required int32 upvotes = 3;
     required int32 downvotes = 4;
 }

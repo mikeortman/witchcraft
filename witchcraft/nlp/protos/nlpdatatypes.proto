@@ -31,7 +31,7 @@ message Sentence {
   repeated Phrase phrases = 1;
 }
 
-message SentenceSequence {
+message Document {
   repeated Sentence sentences = 1;
 }
 

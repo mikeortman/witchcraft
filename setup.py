@@ -12,6 +12,7 @@ setup(
               "witchcraft.nlp",
               "witchcraft.nlp.protos",
               "witchcraft.ml",
+              "witchcraft.ml.protos",
               "witchcraft.util",
               "projects",
               "projects.naughty",

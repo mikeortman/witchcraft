@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='witchcraft',
   syntax='proto2',
   serialized_options=None,
-  serialized_pb=_b('\n(witchcraft/nlp/protos/nlpdatatypes.proto\x12\nwitchcraft\"\x1b\n\x0cPartOfSpeech\x12\x0b\n\x03pos\x18\x01 \x02(\t\"A\n\x0eWordDependency\x12\x0b\n\x03\x64\x65p\x18\x01 \x02(\t\x12\x11\n\theadIndex\x18\x02 \x02(\r\x12\x0f\n\x07myIndex\x18\x03 \x02(\r\"\xd3\x01\n\x04Word\x12.\n\x0cpartOfSpeech\x18\x01 \x02(\x0b\x32\x18.witchcraft.PartOfSpeech\x12\x0c\n\x04word\x18\x02 \x02(\t\x12\r\n\x05lemma\x18\x03 \x02(\t\x12\x12\n\nisStopWord\x18\x04 \x02(\x08\x12\r\n\x05shape\x18\x05 \x02(\t\x12\x16\n\x0epostWhitespace\x18\x06 \x02(\t\x12\x13\n\x0bisAlphaWord\x18\x07 \x02(\x08\x12.\n\ndependency\x18\x08 \x02(\x0b\x32\x1a.witchcraft.WordDependency\")\n\x06Phrase\x12\x1f\n\x05words\x18\x01 \x03(\x0b\x32\x10.witchcraft.Word\"/\n\x08Sentence\x12#\n\x07phrases\x18\x01 \x03(\x0b\x32\x12.witchcraft.Phrase\";\n\x10SentenceSequence\x12\'\n\tsentences\x18\x01 \x03(\x0b\x32\x14.witchcraft.Sentence\"6\n\rWordEmbedding\x12\x0c\n\x04word\x18\x01 \x02(\t\x12\x17\n\x0f\x65mbeddingVector\x18\x02 \x03(\x01')
+  serialized_pb=_b('\n(witchcraft/nlp/protos/nlpdatatypes.proto\x12\nwitchcraft\"\x1b\n\x0cPartOfSpeech\x12\x0b\n\x03pos\x18\x01 \x02(\t\"A\n\x0eWordDependency\x12\x0b\n\x03\x64\x65p\x18\x01 \x02(\t\x12\x11\n\theadIndex\x18\x02 \x02(\r\x12\x0f\n\x07myIndex\x18\x03 \x02(\r\"\xd3\x01\n\x04Word\x12.\n\x0cpartOfSpeech\x18\x01 \x02(\x0b\x32\x18.witchcraft.PartOfSpeech\x12\x0c\n\x04word\x18\x02 \x02(\t\x12\r\n\x05lemma\x18\x03 \x02(\t\x12\x12\n\nisStopWord\x18\x04 \x02(\x08\x12\r\n\x05shape\x18\x05 \x02(\t\x12\x16\n\x0epostWhitespace\x18\x06 \x02(\t\x12\x13\n\x0bisAlphaWord\x18\x07 \x02(\x08\x12.\n\ndependency\x18\x08 \x02(\x0b\x32\x1a.witchcraft.WordDependency\")\n\x06Phrase\x12\x1f\n\x05words\x18\x01 \x03(\x0b\x32\x10.witchcraft.Word\"/\n\x08Sentence\x12#\n\x07phrases\x18\x01 \x03(\x0b\x32\x12.witchcraft.Phrase\"3\n\x08\x44ocument\x12\'\n\tsentences\x18\x01 \x03(\x0b\x32\x14.witchcraft.Sentence\"6\n\rWordEmbedding\x12\x0c\n\x04word\x18\x01 \x02(\t\x12\x17\n\x0f\x65mbeddingVector\x18\x02 \x03(\x01')
 )
 
 
@@ -243,15 +243,15 @@ _SENTENCE = _descriptor.Descriptor(
 )
 
 
-_SENTENCESEQUENCE = _descriptor.Descriptor(
-  name='SentenceSequence',
-  full_name='witchcraft.SentenceSequence',
+_DOCUMENT = _descriptor.Descriptor(
+  name='Document',
+  full_name='witchcraft.Document',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='sentences', full_name='witchcraft.SentenceSequence.sentences', index=0,
+      name='sentences', full_name='witchcraft.Document.sentences', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -270,7 +270,7 @@ _SENTENCESEQUENCE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=458,
-  serialized_end=517,
+  serialized_end=509,
 )
 
 
@@ -307,21 +307,21 @@ _WORDEMBEDDING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=519,
-  serialized_end=573,
+  serialized_start=511,
+  serialized_end=565,
 )
 
 _WORD.fields_by_name['partOfSpeech'].message_type = _PARTOFSPEECH
 _WORD.fields_by_name['dependency'].message_type = _WORDDEPENDENCY
 _PHRASE.fields_by_name['words'].message_type = _WORD
 _SENTENCE.fields_by_name['phrases'].message_type = _PHRASE
-_SENTENCESEQUENCE.fields_by_name['sentences'].message_type = _SENTENCE
+_DOCUMENT.fields_by_name['sentences'].message_type = _SENTENCE
 DESCRIPTOR.message_types_by_name['PartOfSpeech'] = _PARTOFSPEECH
 DESCRIPTOR.message_types_by_name['WordDependency'] = _WORDDEPENDENCY
 DESCRIPTOR.message_types_by_name['Word'] = _WORD
 DESCRIPTOR.message_types_by_name['Phrase'] = _PHRASE
 DESCRIPTOR.message_types_by_name['Sentence'] = _SENTENCE
-DESCRIPTOR.message_types_by_name['SentenceSequence'] = _SENTENCESEQUENCE
+DESCRIPTOR.message_types_by_name['Document'] = _DOCUMENT
 DESCRIPTOR.message_types_by_name['WordEmbedding'] = _WORDEMBEDDING
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -360,12 +360,12 @@ Sentence = _reflection.GeneratedProtocolMessageType('Sentence', (_message.Messag
   ))
 _sym_db.RegisterMessage(Sentence)
 
-SentenceSequence = _reflection.GeneratedProtocolMessageType('SentenceSequence', (_message.Message,), dict(
-  DESCRIPTOR = _SENTENCESEQUENCE,
+Document = _reflection.GeneratedProtocolMessageType('Document', (_message.Message,), dict(
+  DESCRIPTOR = _DOCUMENT,
   __module__ = 'witchcraft.nlp.protos.nlpdatatypes_pb2'
-  # @@protoc_insertion_point(class_scope:witchcraft.SentenceSequence)
+  # @@protoc_insertion_point(class_scope:witchcraft.Document)
   ))
-_sym_db.RegisterMessage(SentenceSequence)
+_sym_db.RegisterMessage(Document)
 
 WordEmbedding = _reflection.GeneratedProtocolMessageType('WordEmbedding', (_message.Message,), dict(
   DESCRIPTOR = _WORDEMBEDDING,

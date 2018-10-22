@@ -5,8 +5,9 @@ from pathlib import Path
 
 from witchcraft.ml.optimizers import Optimizer
 from witchcraft.ml.datasets import WitchcraftDataset
+from witchcraft.nlp.datatypes import Corpus
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordEmbedding as WordEmbeddingProto
-from witchcraft.nlp.parse import Parser
+from witchcraft.nlp.parse import cluster_phrases
 from witchcraft.util.protobuf import protobuf_to_filestream
 
 class Word2VecHyperparameters:
@@ -142,7 +143,7 @@ class Word2VecVocab:
     def get_word_list(self):
         return self._pruned_id_to_word
 
-    def store_skipgrams_to_disk(self, seq_gen) -> None:
+    def store_skipgrams_to_disk(self, corpus: Corpus) -> None:
         current_writer_index = 0
         i = 0
         current_writer = tf.python_io.TFRecordWriter(self.get_skipgram_record_filename(current_writer_index))
@@ -164,9 +165,9 @@ class Word2VecVocab:
                     if i + y < sentence_size and sentence[i + y] is not None:
                             yield (current_word, sentence[i + y])
 
-        for seq in seq_gen():
-            for sentence in seq.get_sentence_generator():
-                phrases = [p.to_phrase_normalized() for p in sentence.get_phrase_generator() if p.provides_contextual_value()]
+        for document in corpus:
+            for sentence in document:
+                phrases = [p.to_phrase_normalized() for p in sentence if p.provides_contextual_value()]
                 phrases = [self.word_to_id(p) for p in phrases]
                 for (skipgram_source, skipgram_target) in generate_skipgrams(phrases):
                     skipgrams_source_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgram_source]))
@@ -186,7 +187,7 @@ class Word2VecVocab:
                         current_writer.close()
                         current_writer_index += 1
                         current_writer = tf.python_io.TFRecordWriter(self.get_skipgram_record_filename(current_writer_index))
-
+        current_writer.close()
 
     def load_skipgrams_to_dataset(self) -> 'Word2VecSkipgramDataset':
         return Word2VecSkipgramDataset(self)
@@ -218,8 +219,6 @@ class Word2VecVocab:
 
             known_filenames += [current_test_filename]
             i += 1
-
-
 
     def to_dataset(self) -> 'Word2VecSkipgramDataset':
         return Word2VecSkipgramDataset(self)
@@ -274,7 +273,7 @@ class Word2VecSkipgramDataset(WitchcraftDataset):
 
         self.map(map_entry, num_parallel_calls=50)
 
-    def get_vocab(self):
+    def get_vocab(self) -> Word2VecVocab:
         return self._vocab
 
 
@@ -283,32 +282,31 @@ class Word2VecVocabBuilder:
         self._vocab: Dict[str, int] = {}
         self._last_built_vocab: Optional[Word2VecVocab] = None
 
-    def add_word_count_to_vocab(self, word: str, count: int) -> None:
+    def add_phrase_count(self, word: str, count: int) -> None:
         if word not in self._vocab:
             self._vocab[word] = 0
 
         self._vocab[word] += count
         self._last_built_vocab = None #Invalidate the build vocab
 
-    def build_and_save(self, sentence_sequence_generator,  hyperparameters: Optional[Word2VecHyperparameters] = None) -> Word2VecVocab:
+    def build_and_save(self, corpus: Corpus,  hyperparameters: Optional[Word2VecHyperparameters] = None) -> Word2VecVocab:
         if hyperparameters is None:
             hyperparameters = Word2VecHyperparameters()
 
-        sentence_sequence_generator = Parser.cached_sentence_sequence_generator(sentence_sequence_generator)
         ngram_mincount = hyperparameters.get_ngram_mincount()
         ngram_maxsize = hyperparameters.get_ngram_max_size()
-        if ngram_mincount is not None:
-            # Bigram clustering is enabled.
-            print("Ngramming is enabled to " + str(ngram_maxsize) + "-gram with min count " + str(ngram_mincount))
-            sentence_sequence_generator = Parser.cluster_phrases(sentence_sequence_generator, ngram_maxsize, ngram_mincount)
-            sentence_sequence_generator = Parser.cached_sentence_sequence_generator(sentence_sequence_generator)
+        # if ngram_mincount is not None:
+        #     # Bigram clustering is enabled.
+        #     print("Ngramming is enabled to " + str(ngram_maxsize) + "-gram with min count " + str(ngram_mincount))
+        #     corpus = cluster_phrases(corpus, ngram_maxsize, ngram_mincount)
 
-        for sequence in sentence_sequence_generator():
-            for phrase in sequence.get_phrase_generator():
-                if not phrase.provides_contextual_value():
-                    continue
+        for document in corpus:
+            for sentence in document:
+                for phrase in sentence:
+                    if not phrase.provides_contextual_value():
+                        continue
 
-                self.add_word_count_to_vocab(phrase.to_phrase_normalized(), 1)
+                    self.add_phrase_count(phrase.to_phrase_normalized(), 1)
 
         if self._last_built_vocab is not None:
             return self._last_built_vocab
@@ -360,7 +358,7 @@ class Word2VecVocabBuilder:
         )
 
         self._last_built_vocab.save_metadata_to_disk()
-        self._last_built_vocab.store_skipgrams_to_disk(sentence_sequence_generator)
+        self._last_built_vocab.store_skipgrams_to_disk(corpus)
         return self._last_built_vocab
 
 
@@ -379,14 +377,7 @@ class Word2VecModel:
         self._vocab = vocab
 
         with self._graph.as_default():
-            # self._dataset = tf.data.Dataset.from_generator(
-            #     training_pair_generator,
-            #     (tf.int32, tf.int32),
-            #     output_shapes=(tf.TensorShape([None]), tf.TensorShape([None]))
-            # )
-
             self._dataset = vocab.to_dataset()
-            # self._dataset = self._dataset.cache()
             self._dataset = self._dataset.repeat()
             self._dataset = self._dataset.shuffle(shuffle_buffer=1000000)
             self._dataset = self._dataset.batch(batch_size=self._hyperparameters.get_batch_size())
@@ -433,7 +424,7 @@ class Word2VecModel:
             self._session.run(tf.global_variables_initializer())
             self._saver = tf.train.Saver()
 
-    def train(self, global_step):
+    def train(self, global_step: int) -> None:
         with self._graph.as_default():
             _, calc_summary = self._session.run([self._optimizer, self._summary])
             self._writer.add_summary(calc_summary, global_step=global_step)
@@ -441,7 +432,7 @@ class Word2VecModel:
             if global_step % 1000 == 0:
                 self._saver.save(self._session, './logs/' + self._hyperparameters.get_name() + '.ckpt', global_step)
 
-    def save_embeddings(self, filename):
+    def save_embeddings(self, filename: str) -> None:
         print("Starting to save...")
         with open(filename, 'wb') as fout:
             vocab_list = self._vocab.get_word_list()

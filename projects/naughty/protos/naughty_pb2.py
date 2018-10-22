@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='',
   syntax='proto2',
   serialized_options=None,
-  serialized_pb=_b('\n%projects/naughty/protos/naughty.proto\x1a(witchcraft/nlp/protos/nlpdatatypes.proto\"\x9d\x01\n\x19UrbanDictionaryDefinition\x12*\n\x04word\x18\x01 \x02(\x0b\x32\x1c.witchcraft.SentenceSequence\x12\x30\n\ndefinition\x18\x02 \x02(\x0b\x32\x1c.witchcraft.SentenceSequence\x12\x0f\n\x07upvotes\x18\x03 \x02(\x05\x12\x11\n\tdownvotes\x18\x04 \x02(\x05')
+  serialized_pb=_b('\n%projects/naughty/protos/naughty.proto\x1a(witchcraft/nlp/protos/nlpdatatypes.proto\"\x8d\x01\n\x19UrbanDictionaryDefinition\x12\"\n\x04word\x18\x01 \x02(\x0b\x32\x14.witchcraft.Document\x12(\n\ndefinition\x18\x02 \x02(\x0b\x32\x14.witchcraft.Document\x12\x0f\n\x07upvotes\x18\x03 \x02(\x05\x12\x11\n\tdownvotes\x18\x04 \x02(\x05')
   ,
   dependencies=[witchcraft_dot_nlp_dot_protos_dot_nlpdatatypes__pb2.DESCRIPTOR,])
 
@@ -75,11 +75,11 @@ _URBANDICTIONARYDEFINITION = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=84,
-  serialized_end=241,
+  serialized_end=225,
 )
 
-_URBANDICTIONARYDEFINITION.fields_by_name['word'].message_type = witchcraft_dot_nlp_dot_protos_dot_nlpdatatypes__pb2._SENTENCESEQUENCE
-_URBANDICTIONARYDEFINITION.fields_by_name['definition'].message_type = witchcraft_dot_nlp_dot_protos_dot_nlpdatatypes__pb2._SENTENCESEQUENCE
+_URBANDICTIONARYDEFINITION.fields_by_name['word'].message_type = witchcraft_dot_nlp_dot_protos_dot_nlpdatatypes__pb2._DOCUMENT
+_URBANDICTIONARYDEFINITION.fields_by_name['definition'].message_type = witchcraft_dot_nlp_dot_protos_dot_nlpdatatypes__pb2._DOCUMENT
 DESCRIPTOR.message_types_by_name['UrbanDictionaryDefinition'] = _URBANDICTIONARYDEFINITION
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 

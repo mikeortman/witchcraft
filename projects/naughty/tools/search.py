@@ -48,8 +48,9 @@ def home():
     source_text = request.args.get('text')
 
     sentenceSequence = Parser.parse_string_to_sentence_sequence(source_text)
+    sentenceSequence = Parser.cluster_phrases_by_dictionary(sentenceSequence, embeddingToId, 4)
 
-    wordsToLookup = [s.get_word_string_normalized() for s in sentenceSequence.get_word_generator() if s.get_word_string_normalized() in embeddingToId]
+    wordsToLookup = [p.to_phrase_normalized() for p in sentenceSequence.get_phrase_generator() if p.to_phrase_normalized() in embeddingToId]
     wordsToLookupIdx = [embeddingToId[i] for i in wordsToLookup]
     foundIdx, foundStrength = session.run([topTenIdx, topTenVals], {searchWordIndexes: wordsToLookupIdx})
 
@@ -59,13 +60,13 @@ def home():
         wordSimilar = [idToEmbedding[x] for x in foundIdx[i]]
         wordSimilarStrength = foundStrength[i]
         wordDict = {
-            'word': word,
+            'phrase': word,
             'similar': []
         }
 
         for y in range(len(wordSimilar)):
             wordDict['similar'] += [{
-                'word': wordSimilar[y],
+                'phrase': wordSimilar[y],
                 'strength': float(wordSimilarStrength[y])
             }]
 
@@ -81,16 +82,16 @@ def home():
         print(sentence)
         sentenceJson = {
             'sentence_text': str(sentence),
-            'words': []
+            'phrases': []
         }
 
-        for word in sentence.get_word_generator():
-            wordNorm = word.get_word_string_normalized()
-            if wordNorm in foundWordMatches:
-                sentenceJson['words'] += [foundWordMatches[wordNorm]]
+        for phrase in sentence.get_phrase_generator():
+            phrase_norm = phrase.to_phrase_normalized()
+            if phrase_norm in foundWordMatches:
+                sentenceJson['phrases'] += [foundWordMatches[phrase_norm]]
             else:
-                sentenceJson['words'] += [{
-                    'word': wordNorm
+                sentenceJson['phrases'] += [{
+                    'phrase': phrase_norm
                 }]
 
         responseJson['sentences'] += [sentenceJson]

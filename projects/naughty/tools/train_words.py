@@ -1,14 +1,13 @@
 from sys import argv
 from multiprocessing import Pool
-from typing import List, Dict, Optional
-import itertools
+from typing import Optional, List
 
 from witchcraft.util.protobuf import protobufs_from_filestream
 from witchcraft.ml.models.word2vec import Word2VecVocabBuilder, Word2VecVocab, Word2VecHyperparameters, Word2VecModel
 from witchcraft.ml.optimizers import WitchcraftAdagradOptimizer
 from projects.naughty.protos.naughty_pb2 import UrbanDictionaryDefinition as UrbanDictionaryDefinitionProto
 from projects.naughty.definition import UrbanDictionaryDefinition
-from witchcraft.nlp.parse import Parser
+from witchcraft.nlp.datatypes import Document, Corpus
 
 
 hyperparameters = Word2VecHyperparameters()\
@@ -30,18 +29,20 @@ if vocab is None:
     vocab_builder: Word2VecVocabBuilder = Word2VecVocabBuilder()
 
 
-    def sentence_sequence_generator_from_files():
-        for filename in argv[1:]:
+    def corpus_from_files(files: List[str]):
+        docs: List[Document] = []
+        for filename in files:
             print("Loading file: " + filename)
             with open(filename, 'rb') as fin:
                 for pb_str in protobufs_from_filestream(fin):
                     pb = UrbanDictionaryDefinitionProto.FromString(pb_str)
                     definition = UrbanDictionaryDefinition.from_protobuf(pb)
-                    yield definition.get_word_sequence()
-                    yield definition.get_definition_sequence()
+                    docs += [definition.get_word(), definition.get_definition()]
+
+        return Corpus(docs)
 
     vocab = vocab_builder.build_and_save(
-        sentence_sequence_generator=sentence_sequence_generator_from_files,
+        corpus=corpus_from_files(argv[1:]),
         hyperparameters=hyperparameters
     )
 

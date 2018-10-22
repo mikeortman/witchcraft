@@ -4,11 +4,8 @@ from witchcraft.nlp.protos.nlpdatatypes_pb2 import Word as WordProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import PartOfSpeech as PartOfSpeechProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import Phrase as PhraseProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import Sentence as SentenceProto
-from witchcraft.nlp.protos.nlpdatatypes_pb2 import SentenceSequence as SentenceSequenceProto
+from witchcraft.nlp.protos.nlpdatatypes_pb2 import Document as DocumentProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordDependency as WordDependencyProto
-from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordEmbedding as WordEmbeddingProto
-import tensorflow as tf
-import numpy as np
 
 class PartOfSpeech:
     def __init__(self, pos: Optional[str] = None) -> None:
@@ -189,32 +186,31 @@ class Phrase:
     def __init__(self, words: Optional[List[Word]] = None) -> None:
         self._words: List[Word] = words if words is not None else []
 
-    def get_word_generator(self) -> Generator[Word, None, None]:
-        for word in self._words:
-            yield word
+    def __iter__(self):
+        return iter(self._words)
 
     def __str__(self)-> str:
         # TODO: Make Faster
         return ''.join(
-            [w.get_word_string() + w.get_whitespace_postfix() for w in self.get_word_generator()]
+            [w.get_word_string() + w.get_whitespace_postfix() for w in self]
         )
 
     def to_phrase_normalized(self):
-        return ' '.join([w.get_word_string_normalized() for w in self.get_word_generator()])
+        return ' '.join([w.get_word_string_normalized() for w in self])
 
     def to_protobuf(self) -> PhraseProto:
         return PhraseProto(
-            words=[w.to_protobuf() for w in self.get_word_generator()]
+            words=[w.to_protobuf() for w in self]
         )
 
     def is_word(self):
         return len(self._words) == 1
 
     def to_array(self) -> List[any]:
-        return [w.to_array() for w in self.get_word_generator()]
+        return [w.to_array() for w in self]
 
     def provides_contextual_value(self) -> bool:
-        for word in self.get_word_generator():
+        for word in self:
             if not word.provides_contextual_value():
                 return False
 
@@ -234,7 +230,7 @@ class Phrase:
     def merge_phrases(cls, phrases: List['Phrase']) -> 'Phrase':
         words = []
         for phrase in phrases:
-            words += list(phrase.get_word_generator())
+            words += list(iter(phrase))
 
         return Phrase(words)
 
@@ -243,25 +239,19 @@ class Sentence:
     def __init__(self, phrases: Optional[List[Phrase]] = None) -> None:
         self._phrases: List[Phrase] = phrases if phrases is not None else []
 
-    def get_word_generator(self) -> Generator[Word, None, None]:
-        for phrase in self.get_phrase_generator():
-            for word in phrase.get_word_generator():
-                yield word
-
-    def get_phrase_generator(self) -> Generator[Phrase, None, None]:
-        for phrase in self._phrases:
-            yield phrase
+    def __iter__(self):
+        return iter(self._phrases)
 
     def __str__(self) -> str:
-        return ''.join([str(p) for p in self.get_phrase_generator()])
+        return ''.join([str(p) for p in self])
 
     def to_protobuf(self) -> SentenceProto:
         return SentenceProto(
-            phrases=[p.to_protobuf() for p in self.get_phrase_generator()]
+            phrases=[p.to_protobuf() for p in self]
         )
 
     def to_array(self) -> List[any]:
-        return [p.to_array() for p in self.get_phrase_generator()]
+        return [p.to_array() for p in self]
 
 
     @classmethod
@@ -275,62 +265,37 @@ class Sentence:
         )
 
 
-class SentenceSequence:
+class Document:
     def __init__(self, sentences: Optional[List[Sentence]] = None) -> None:
         self._sentences: List[Sentence] = sentences if sentences is not None else []
 
-    def get_sentence_generator(self) -> Generator[Sentence, None, None]:
-        for sentence in self._sentences:
-            yield sentence
-
-    def get_phrase_generator(self) -> Generator[Phrase, None, None]:
-        for sentence in self._sentences:
-            for phrase in sentence.get_phrase_generator():
-                yield phrase
-
-    def get_word_generator(self) -> Generator[Word, None, None]:
-        for sentence in self._sentences:
-            for word in sentence.get_word_generator():
-                yield word
-
-    def get_sequence_generator(self) -> Generator['SentenceSequence', None, None]:
-        yield self
+    def __iter__(self):
+        return iter(self._sentences)
 
     def __str__(self) -> str:
-        return ''.join([str(s) for s in self.get_sentence_generator()])
+        return ''.join([str(s) for s in iter(self)])
 
-    def to_protobuf(self) -> SentenceSequenceProto:
-        return SentenceSequenceProto(
-            sentences=[s.to_protobuf() for s in self.get_sentence_generator()]
+    def to_protobuf(self) -> DocumentProto:
+        return DocumentProto(
+            sentences=[s.to_protobuf() for s in iter(self)]
         )
 
     def to_array(self) -> List[any]:
-        return [s.to_array() for s in self.get_sentence_generator()]
+        return [s.to_array() for s in iter(self)]
 
     @classmethod
-    def from_protobuf(cls, sentence_seq_proto: SentenceSequenceProto) -> 'SentenceSequence':
-        return SentenceSequence([Sentence.from_protobuf(sentence_proto=s) for s in sentence_seq_proto.sentences])
+    def from_protobuf(cls, document_proto: DocumentProto) -> 'Document':
+        return Document([Sentence.from_protobuf(sentence_proto=s) for s in document_proto.sentences])
 
     @classmethod
-    def from_array(cls, arr: List[any]) -> 'SentenceSequence':
-        return SentenceSequence(
+    def from_array(cls, arr: List[any]) -> 'Document':
+        return Document(
             sentences=[Sentence.from_array(s) for s in arr]
         )
 
-class WordEmbedding:
-    def __init__(self, word: str, embedding: List[float]):
-        self._word = word
-        self._embedding = list(embedding)
+class Corpus:
+    def __init__(self, documents: Optional[List[Document]] = None) -> None:
+        self._documents: List[Document] = documents if documents is not None else []
 
-    def get_word(self) -> str:
-        return self._word
-
-    def get_embedding(self) -> List[float]:
-        return self._embedding
-
-    @classmethod
-    def from_protobuf(cls, word_embedding_proto: WordEmbeddingProto) -> 'WordEmbedding':
-        return WordEmbedding(
-            word_embedding_proto.word,
-            word_embedding_proto.embeddingVector
-        )
+    def __iter__(self):
+        return iter(self._documents)
