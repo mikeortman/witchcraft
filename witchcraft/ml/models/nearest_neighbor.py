@@ -26,18 +26,17 @@ class NearestNeighborModel:
             embedding_normal = tf.sqrt(tf.reduce_sum(tf.square(embedding_matrix), axis=-1))
 
             embedding_size = embedding_matrix.shape[1]
-            self._search_embeddings = tf.placeholder(tf.int32, shape=[None, embedding_size])
-            self._search_embeddings = tf.gather(embedding_matrix, self._search_embeddings)
+            self._search_embedding = tf.placeholder(tf.float32, shape=[None, embedding_size])
             self._result_count = tf.placeholder(tf.int32, shape=[])
-            search_embeddings_normal = tf.sqrt(tf.reduce_sum(tf.square(self._search_embeddings), axis=-1))
+            search_embeddings_normal = tf.sqrt(tf.reduce_sum(tf.square(self._search_embedding), axis=-1))
 
-            search_dot_product = tf.reduce_sum(tf.expand_dims(self._search_embeddings, axis=1) * embedding_matrix, axis=-1)
+            search_dot_product = tf.reduce_sum(tf.expand_dims(self._search_embedding, axis=1) * embedding_matrix, axis=-1)
             cosine_sim = search_dot_product / embedding_normal / tf.expand_dims(search_embeddings_normal, axis=-1)
             self._top_ten_vals, self._top_ten_indicies = tf.nn.top_k(cosine_sim, k=self._result_count, sorted=True)
 
     def lookup_nearby(self, embedding: Embedding, max_results: int = 10) -> List[NearestNeighborResult]:
         strengths, indicies = self._session.run([self._top_ten_vals, self._top_ten_indicies], feed_dict={
-            self._search_embeddings: [embedding.get_vector()],
+            self._search_embedding: [embedding.get_vector()],
             self._result_count: max_results
         })
 
