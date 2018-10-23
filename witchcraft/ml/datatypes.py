@@ -8,7 +8,7 @@ class Embedding:
         self._vector = list(vector)
 
     def get_vector(self) -> List[float]:
-        return self._embedding
+        return self._vector
 
 
 class PhraseEmbedding(Embedding):

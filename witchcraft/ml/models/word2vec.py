@@ -6,7 +6,7 @@ from pathlib import Path
 from witchcraft.ml.optimizers import Optimizer
 from witchcraft.ml.datasets import WitchcraftDataset
 from witchcraft.nlp.datatypes import Corpus
-from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordEmbedding as WordEmbeddingProto
+from witchcraft.ml.datatypes import PhraseEmbedding
 from witchcraft.nlp.parse import cluster_phrases
 from witchcraft.util.protobuf import protobuf_to_filestream
 
@@ -122,7 +122,7 @@ class Word2VecVocab:
         self._pruned_id_to_word: List[str] = pruned_id_to_word
         self._vocab_size: int = len(self._pruned_id_to_word)
 
-    def word_to_id(self, word: str) -> int:
+    def word_to_id(self, word: str) -> Optional[int]:
         if word not in self._pruned_word_to_id:
             return None
 
@@ -280,14 +280,12 @@ class Word2VecSkipgramDataset(WitchcraftDataset):
 class Word2VecVocabBuilder:
     def __init__(self) -> None:
         self._vocab: Dict[str, int] = {}
-        self._last_built_vocab: Optional[Word2VecVocab] = None
 
-    def add_phrase_count(self, word: str, count: int) -> None:
-        if word not in self._vocab:
-            self._vocab[word] = 0
+    def add_phrase_count(self, phrase: str, count: int) -> None:
+        if phrase not in self._vocab:
+            self._vocab[phrase] = 0
 
-        self._vocab[word] += count
-        self._last_built_vocab = None #Invalidate the build vocab
+        self._vocab[phrase] += count
 
     def build_and_save(self, corpus: Corpus,  hyperparameters: Optional[Word2VecHyperparameters] = None) -> Word2VecVocab:
         if hyperparameters is None:
@@ -308,8 +306,6 @@ class Word2VecVocabBuilder:
 
                     self.add_phrase_count(phrase.to_phrase_normalized(), 1)
 
-        if self._last_built_vocab is not None:
-            return self._last_built_vocab
 
         pruned = [(k,v) for k,v in self._vocab.items() if v >= hyperparameters.get_min_word_count()]
         pruned.sort(key=lambda x: -x[1])
@@ -350,16 +346,16 @@ class Word2VecVocabBuilder:
 
         pruned = {k: v for (k, v) in pruned}
 
-        self._last_built_vocab = Word2VecVocab(
+        vocab = Word2VecVocab(
             hyperparameters=hyperparameters,
             pruned=pruned,
             pruned_word_to_id=pruned_word_to_id,
             pruned_id_to_word=pruned_id_to_word
         )
 
-        self._last_built_vocab.save_metadata_to_disk()
-        self._last_built_vocab.store_skipgrams_to_disk(corpus)
-        return self._last_built_vocab
+        vocab.save_metadata_to_disk()
+        vocab.store_skipgrams_to_disk(corpus)
+        return vocab
 
 
 class Word2VecModel:
@@ -435,17 +431,13 @@ class Word2VecModel:
     def save_embeddings(self, filename: str) -> None:
         print("Starting to save...")
         with open(filename, 'wb') as fout:
-            vocab_list = self._vocab.get_word_list()
-            embeddings = self._session.run(self._word_embed_matrix)
-            for i in range(len(vocab_list)):
-                word = vocab_list[i]
-                embedding = embeddings[i]
-                # print(word + ": " + str(embedding))
-                embeddingProto = WordEmbeddingProto(
-                    word=word,
-                    embeddingVector=embedding
-                )
-                protobuf_to_filestream(fout, embeddingProto.SerializeToString())
+            vocab_counts = self._vocab.get_vocab()
+            embedding_vectors = self._session.run(self._word_embed_matrix)
+            for phrase, count in vocab_counts.items():
+                phrase_id = self._vocab.word_to_id(phrase)
+                embedding_vector = embedding_vectors[phrase_id]
+                embedding_proto = PhraseEmbedding(phrase, count, embedding_vector).to_protobuf()
+                protobuf_to_filestream(fout, embedding_proto.SerializeToString())
 
         print("Done saving")
 
