@@ -31,7 +31,7 @@ print("Done loading embeddings.")
 def home():
     source_text = request.args.get('text')
 
-    input_document = parse_string_to_document
+    input_document = parse_string_to_document(source_text)
     document_json = []
     for sentence in input_document:
         sentence_json = {
