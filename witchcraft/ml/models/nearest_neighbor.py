@@ -47,7 +47,7 @@ class NearestNeighborModel:
         for i in range(len(indicies)):
             current_index = indicies[i]
             current_strength = strengths[i]
-            results += [NearestNeighborResult(self._embeddings[current_index], current_strength)]
+            results += [NearestNeighborResult(self._embeddings[current_index], float(current_strength))]
 
         return results
 
