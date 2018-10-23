@@ -20,7 +20,7 @@ with open(argv[1], 'rb') as fin:
     for pb_str in protobufs_from_filestream(fin):
         pb: PhraseEmbeddingProto = PhraseEmbeddingProto.FromString(pb_str)
         embedding: PhraseEmbedding = PhraseEmbedding.from_protobuf(pb)
-        embeddings += [embeddings]
+        embeddings += [embedding]
         phrase_to_embedding[embedding.get_phrase()] = embedding
 
 search_model: NearestNeighborModel = NearestNeighborModel(embeddings)

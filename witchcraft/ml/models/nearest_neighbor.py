@@ -27,6 +27,7 @@ class NearestNeighborModel:
 
             embedding_size = embedding_matrix.shape[1]
             self._search_embeddings = tf.placeholder(tf.int32, shape=[None, embedding_size])
+            self._search_embeddings = tf.gather(embedding_matrix, self._search_embeddings)
             self._result_count = tf.placeholder(tf.int32, shape=[])
             search_embeddings_normal = tf.sqrt(tf.reduce_sum(tf.square(self._search_embeddings), axis=-1))
 
