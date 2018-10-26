@@ -63,8 +63,8 @@ while True:
     model.train(i)
     i += 1
 
-    if i % 500 == 0:
-        print (str(i * 128))
+    if i % 10000 == 0:
+        print (str(i))
         model.save_embeddings("win_" + str(i) + ".embeddings")
 
 # for filename in argv[1:]:
