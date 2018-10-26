@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from witchcraft.nlp.datatypes import Corpus
 from witchcraft.ml.datasets import WitchcraftDatasetIntegerRange
-from witchcraft.ml.optimizers import WitchcraftAdamOptimizer
+from witchcraft.ml.optimizers import WitchcraftMomentumOptimizer
 from witchcraft.ml.datatypes import PhraseEmbedding
 from witchcraft.util.protobuf import protobuf_to_filestream
 
@@ -134,7 +134,7 @@ class GloVeModel:
             self._word_embeddings = self._word_embeddings_target + self._word_embeddings_context
             print(self._word_embeddings.shape)
 
-            self._optimizer = WitchcraftAdamOptimizer().to_tf_optimizer().minimize(self._loss)
+            self._optimizer = WitchcraftMomentumOptimizer().to_tf_optimizer().minimize(self._loss)
             self._summary = tf.summary.scalar("loss", self._loss)
             self._writer = tf.summary.FileWriter('./logs/' + "glove", self._session.graph)
 
