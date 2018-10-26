@@ -25,7 +25,7 @@ class GloVeModel:
                     if phrase_norm not in phrase_counts:
                         phrase_counts[phrase_norm] = 0
 
-                        phrase_counts[phrase_norm] += 1
+                    phrase_counts[phrase_norm] += 1
 
         print ("Sorting by size...")
         self._phrase_counts = [(phrase, count) for phrase, count in phrase_counts.items() if count > 25]
