@@ -154,6 +154,7 @@ class GloVeModel:
         print("Starting to save...")
         with open(filename, 'wb') as fout:
             embedding_vectors = self._session.run(self._word_embeddings)
+            print(embedding_vectors)
 
             for phrase_id in range(len(self._phrase_counts)):
                 (phrase, count) = self._phrase_counts[phrase_id]
