@@ -134,7 +134,7 @@ class GloVeModel:
             self._word_embeddings = self._word_embeddings_target + self._word_embeddings_context
             print(self._word_embeddings.shape)
 
-            self._optimizer = WitchcraftGradientDescentOptimizer(0.005).to_tf_optimizer().minimize(self._loss)
+            self._optimizer = WitchcraftGradientDescentOptimizer(0.1).to_tf_optimizer().minimize(self._loss)
             self._summary = tf.summary.scalar("loss", self._loss)
             self._writer = tf.summary.FileWriter('./logs/' + "glove", self._session.graph)
 
