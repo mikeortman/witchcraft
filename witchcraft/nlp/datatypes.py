@@ -1,4 +1,4 @@
-from typing import Generator, List, Optional
+from typing import Generator, List, Optional, Tuple
 
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import Word as WordProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import PartOfSpeech as PartOfSpeechProto
@@ -252,6 +252,23 @@ class Sentence:
 
     def to_array(self) -> List[any]:
         return [p.to_array() for p in self]
+
+    def skipgrams(self, window_size: int) -> Generator[Tuple[Phrase, Phrase, int], None, None]:
+        valid_phrases = [p for p in self._phrases if p.provides_contextual_value()]
+        sentence_size: int = len(valid_phrases)
+
+        for i in range(sentence_size):
+            current_phrase = valid_phrases[i]
+            if current_phrase is None:
+                continue
+
+            for y in range(1, window_size + 1):
+                if i - y >= 0 and valid_phrases[i - y] is not None:
+                    yield (current_phrase, valid_phrases[i - y], y)
+
+            for y in range(1, window_size + 1):
+                if i + y < sentence_size and valid_phrases[i + y] is not None:
+                    yield (current_phrase, valid_phrases[i + y], y)
 
 
     @classmethod

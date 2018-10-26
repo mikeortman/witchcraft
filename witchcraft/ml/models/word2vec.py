@@ -148,30 +148,18 @@ class Word2VecVocab:
         i = 0
         current_writer = tf.python_io.TFRecordWriter(self.get_skipgram_record_filename(current_writer_index))
 
-        def generate_skipgrams(sentence: List[Optional[int]]) -> Generator[Tuple[int, int], None, None]:
-            sentence_size: int = len(sentence)
-            window_size: int = self._hyperparameters.get_skipgram_window_size()
-
-            for i in range(sentence_size):
-                current_word = sentence[i]
-                if current_word is None:
-                    continue
-
-                for y in range(1, window_size + 1):
-                    if i - y >= 0 and sentence[i - y] is not None:
-                        yield (current_word, sentence[i - y])
-
-                for y in range(1, window_size + 1):
-                    if i + y < sentence_size and sentence[i + y] is not None:
-                            yield (current_word, sentence[i + y])
 
         for document in corpus:
             for sentence in document:
-                phrases = [p.to_phrase_normalized() for p in sentence if p.provides_contextual_value()]
-                phrases = [self.word_to_id(p) for p in phrases]
-                for (skipgram_source, skipgram_target) in generate_skipgrams(phrases):
-                    skipgrams_source_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgram_source]))
-                    skipgrams_target_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[skipgram_target]))
+                for (source, target, distance) in sentence.skipgrams(self._hyperparameters.get_skipgram_window_size()):
+                    source_idx = self.word_to_id(source.to_phrase_normalized())
+                    target_idx = self.word_to_id(target.to_phrase_normalized())
+
+                    if source_idx is None or target_idx is None:
+                        continue
+
+                    skipgrams_source_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[source_idx]))
+                    skipgrams_target_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[target_idx]))
 
                     features = {
                         's': skipgrams_source_feature,

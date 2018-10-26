@@ -37,6 +37,8 @@ class WitchcraftDataset:
     def to_tf_iterator(self) -> tf.data.Iterator:
         return self._current_dataset.make_one_shot_iterator()
 
-    @classmethod
-    def from_files(cls, file_pattern: str) -> 'WitchcraftDataset':
-        return WitchcraftDatasetFiles(file_pattern)
+
+class WitchcraftDatasetIntegerRange(WitchcraftDataset):
+    def __init__(self, max_int: int):
+        r = list(range(max_int))
+        WitchcraftDataset.__init__(self, tf.data.Dataset.from_tensor_slices(r))
