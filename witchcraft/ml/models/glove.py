@@ -157,7 +157,7 @@ class GloVeModel:
 
             for phrase_id in range(len(self._phrase_counts)):
                 (phrase, count) = self._phrase_counts[phrase_id]
-                embedding_vector = embedding_vectors[phrase_id]
+                embedding_vector = list(embedding_vectors[phrase_id])
                 embedding_proto = PhraseEmbedding(phrase, count, embedding_vector).to_protobuf()
                 protobuf_to_filestream(fout, embedding_proto.SerializeToString())
 
