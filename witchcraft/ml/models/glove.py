@@ -29,10 +29,10 @@ class GloVeModel:
 
         print ("Sorting by size...")
         self._phrase_counts = [(phrase, count) for phrase, count in phrase_counts.items()]
-        sorted(phrase_counts, key=lambda a: -a[1])
+        sorted(self._phrase_counts, key=lambda a: -a[1])
 
         print ("Truncating...")
-        self._phrase_counts = phrase_counts[:30000]
+        self._phrase_counts = self._phrase_counts[:30000]
 
         total_phrases = len(self._phrase_counts)
         print ("Total phrases: " + str(total_phrases))
