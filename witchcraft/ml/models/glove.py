@@ -28,7 +28,7 @@ class GloVeModel:
                     phrase_counts[phrase_norm] += 1
 
         print ("Sorting by size...")
-        self._phrase_counts = [(phrase, count) for phrase, count in phrase_counts.items() if count > 5]
+        self._phrase_counts = [(phrase, count) for phrase, count in phrase_counts.items() if count > 20]
         sorted(self._phrase_counts, key=lambda a: -a[1])
 
         print ("Truncating...")
