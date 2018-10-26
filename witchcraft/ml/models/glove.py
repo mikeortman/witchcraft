@@ -101,7 +101,7 @@ class GloVeModel:
             j = tf.transpose(tf.reshape(tf.tile(context_word_id_batch, [BATCH_SIZE]), shape=[-1,BATCH_SIZE]))
             ij = tf.concat([tf.expand_dims(i, axis=-1), tf.expand_dims(j, axis=-1)], axis=-1)
             x_ij = tf.gather_nd(self._cooccurance_matrix, ij)
-            log_x_ij = tf.log(x_ij)
+            log_x_ij = tf.log(tf.maximum(x_ij,1e-9))
 
 
             embedding_target = tf.gather_nd(self._word_embeddings_target, tf.expand_dims(i, -1))
