@@ -28,7 +28,7 @@ class GloVeModel:
                     phrase_counts[phrase_norm] += 1
 
         print ("Sorting by size...")
-        self._phrase_counts = [(phrase, count) for phrase, count in phrase_counts.items() if count > 25]
+        self._phrase_counts = [(phrase, count) for phrase, count in phrase_counts.items()]
         sorted(self._phrase_counts, key=lambda a: -a[1])
 
         print ("Truncating...")
@@ -134,7 +134,7 @@ class GloVeModel:
             self._word_embeddings = self._word_embeddings_target + self._word_embeddings_context
             print(self._word_embeddings.shape)
 
-            self._optimizer = WitchcraftGradientDescentOptimizer(0.001).to_tf_optimizer().minimize(self._loss)
+            self._optimizer = WitchcraftGradientDescentOptimizer(0.1).to_tf_optimizer().minimize(self._loss)
             self._summary = tf.summary.scalar("loss", self._loss)
             self._writer = tf.summary.FileWriter('./logs/' + "glove", self._session.graph)
 
