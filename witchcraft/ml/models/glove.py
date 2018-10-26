@@ -101,7 +101,7 @@ class GloVeModel:
             j = tf.transpose(tf.reshape(tf.tile(context_word_id_batch, [BATCH_SIZE]), shape=[-1,BATCH_SIZE]))
             ij = tf.concat([tf.expand_dims(i, axis=-1), tf.expand_dims(j, axis=-1)], axis=-1)
             x_ij = tf.gather_nd(self._cooccurance_matrix, ij)
-            log_x_ij = tf.log(x_ij+1)
+            log_x_ij = tf.log(x_ij)
 
 
             embedding_target = tf.gather_nd(self._word_embeddings_target, tf.expand_dims(i, -1))
@@ -134,7 +134,7 @@ class GloVeModel:
             self._word_embeddings = self._word_embeddings_target + self._word_embeddings_context
             print(self._word_embeddings.shape)
 
-            self._optimizer = WitchcraftGradientDescentOptimizer(0.001).to_tf_optimizer().minimize(self._loss)
+            self._optimizer = WitchcraftGradientDescentOptimizer(0.005).to_tf_optimizer().minimize(self._loss)
             self._summary = tf.summary.scalar("loss", self._loss)
             self._writer = tf.summary.FileWriter('./logs/' + "glove", self._session.graph)
 
