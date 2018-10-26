@@ -63,7 +63,7 @@ while True:
     model.train(i)
     i += 1
 
-    if i % 1000 == 0:
+    if i % 500 == 0:
         print (str(i * 128))
         model.save_embeddings("win_" + str(i) + ".embeddings")
 
