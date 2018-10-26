@@ -127,8 +127,12 @@ class GloVeModel:
             loss_weight = tf.minimum((x_ij / xmax) ** alpha, 1.0)
             # bias_target = tf.Print(bias_target, [tf.reduce_sum(bias_target)], "BT")
 
+            print(self._word_embeddings_context.shape)
+            print(self._word_embeddings_target.shape)
+
             self._loss = tf.reduce_sum(loss_weight * ((embedding_dot_product + bias_target + bias_context - log_x_ij) ** 2))
-            self._word_embeddings = embedding_target + embedding_context
+            self._word_embeddings = self._word_embeddings_target + self._word_embeddings_context
+            print(self._word_embeddings.shape)
 
             self._optimizer = WitchcraftGradientDescentOptimizer(0.005).to_tf_optimizer().minimize(self._loss)
             self._summary = tf.summary.scalar("loss", self._loss)
@@ -154,7 +158,7 @@ class GloVeModel:
         print("Starting to save...")
         with open(filename, 'wb') as fout:
             embedding_vectors = self._session.run(self._word_embeddings)
-            print(embedding_vectors)
+            print(embedding_vectors[0])
 
             for phrase_id in range(len(self._phrase_counts)):
                 (phrase, count) = self._phrase_counts[phrase_id]
