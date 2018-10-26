@@ -61,8 +61,9 @@ class GloVeModel:
                     target_idx = self._phrase_id_map[target.to_phrase_normalized()]
                     self._cooccurance_matrix_arr[source_idx, target_idx] += 1.0 / distance
 
-            print ("Done with document " + str(i))
             i += 1
+            if i % 1000 == 0:
+                print ("Done with document " + str(i))
 
 
 
@@ -78,7 +79,7 @@ class GloVeModel:
 
 
             #Build the model
-            EMBEDDING_SIZE=200
+            EMBEDDING_SIZE=300
             self._word_embeddings_target = tf.Variable(
                 tf.random_uniform([total_phrases, EMBEDDING_SIZE], -1.0, 1.0),
                 name="WordEmbeddingsMatrixTarget"

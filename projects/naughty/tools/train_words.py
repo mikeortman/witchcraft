@@ -65,8 +65,6 @@ while True:
 
     if i % 1000 == 0:
         print (str(i * 128))
-
-    if i % 1000 == 0:
         model.save_embeddings("win_" + str(i) + ".embeddings")
 
 # for filename in argv[1:]:
