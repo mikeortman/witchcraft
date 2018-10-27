@@ -73,7 +73,7 @@ class GloVeModel:
 
         print("Building TF graph")
         with self._graph.as_default():
-            BATCH_SIZE=2000
+            BATCH_SIZE=1000
             self._cooccurance_matrix_placeholder = tf.placeholder(dtype=tf.float32, shape=[total_phrases, total_phrases])
             self._cooccurance_matrix = tf.Variable(self._cooccurance_matrix_placeholder, trainable=False)
 
