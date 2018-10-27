@@ -94,6 +94,9 @@ class GloVeHyperparameters:
 
 class GloVeModel:
     def __init__(self, corpus: Corpus, hyperparameters: Optional[GloVeHyperparameters]) -> None:
+        self._train_loss_accum_count:int = 0
+        self._train_loss_accum:float = 0.0
+
         self._graph = tf.Graph()
         self._session = tf.Session(graph=self._graph)
 
@@ -244,9 +247,15 @@ class GloVeModel:
             _, calc_summary, loss = self._session.run([self._optimizer, self._summary, self._loss])
 
             self._writer.add_summary(calc_summary, global_step=global_step)
+            self._train_loss_accum_count += 1
+            self._train_loss_accum += loss
 
             if global_step % 50 == 0:
-                print("LAST LOSS: " + str(loss))
+                self._train_loss_accum_count = self._train_loss_accum_count if self._train_loss_accum_count > 0 else 1
+                print("AVERAGE LOSS: " + str(self._train_loss_accum / self._train_loss_accum_count))
+                self._train_loss_accum_count = 0
+                self._train_loss_accum = 0
+
                 self._saver.save(self._session, './logs/' + self._hyperparameters.get_name() + '.ckpt', global_step)
 
     def save_embeddings(self, filename: str) -> None:
