@@ -63,15 +63,16 @@ def corpus_from_files(files: List[str]):
 print("Building")
 
 hyperparameters: GloVeHyperparameters = GloVeHyperparameters()\
-    .set_name("glove_test")\
+    .set_name("glove_test_const")\
     .set_embedding_size(300)\
     .set_batch_size(1000)\
-    .set_window_size(5)\
+    .set_window_size(3)\
     .set_loss_weight_alpha(0.75)\
     .set_loss_weight_xmax(100)\
     .set_min_word_count(25)\
     .set_max_vocab_size(30000)\
-    .set_optimizer(WitchcraftAdagradOptimizer(0.5))
+    .set_optimizer(WitchcraftAdagradOptimizer(0.5))\
+    .set_distance_weight_function(lambda d: 1.0)
 
 model: GloVeModel = GloVeModel(corpus=corpus_from_files(argv[1:]), hyperparameters=hyperparameters)
 
@@ -83,4 +84,4 @@ while True:
 
     if i % 500 == 0:
         print (str(i))
-        model.save_embeddings("win_" + str(i) + ".embeddings")
+        model.save_embeddings("glove_test_const_" + str(i) + ".embeddings")
