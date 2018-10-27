@@ -264,7 +264,7 @@ class Sentence:
 
             for y in range(1, window_size + 1):
                 if i - y >= 0 and valid_phrases[i - y] is not None:
-                    yield (current_phrase, valid_phrases[i - y], y)
+                    yield (current_phrase, valid_phrases[i - y], -y)
 
             for y in range(1, window_size + 1):
                 if i + y < sentence_size and valid_phrases[i + y] is not None:

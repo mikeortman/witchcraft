@@ -4,7 +4,7 @@ import math
 
 from witchcraft.nlp.datatypes import Corpus
 from witchcraft.ml.datasets import WitchcraftDatasetIntegerRange
-from witchcraft.ml.optimizers import WitchcraftAdamOptimizer
+from witchcraft.ml.optimizers import WitchcraftAdagradOptimizer
 from witchcraft.ml.datatypes import PhraseEmbedding
 from witchcraft.util.protobuf import protobuf_to_filestream
 
@@ -51,7 +51,10 @@ class GloVeModel:
         i = 0
         for document in corpus:
             for sentence in document:
-                for (source, target, distance) in sentence.skipgrams(10):
+                for (source, target, distance) in sentence.skipgrams(8):
+                    if distance > 0:
+                        continue # Let's try to be asymmetrical (only left)
+
                     source_norm = source.to_phrase_normalized()
                     target_norm = target.to_phrase_normalized()
 
@@ -60,7 +63,7 @@ class GloVeModel:
 
                     source_idx = self._phrase_id_map[source.to_phrase_normalized()]
                     target_idx = self._phrase_id_map[target.to_phrase_normalized()]
-                    self._cooccurance_matrix_arr[source_idx, target_idx] += 1.0 / math.sqrt(distance)
+                    self._cooccurance_matrix_arr[source_idx, target_idx] += 1.0 / abs(distance)
 
             i += 1
             if i % 1000 == 0:
@@ -70,7 +73,7 @@ class GloVeModel:
 
         print("Building TF graph")
         with self._graph.as_default():
-            BATCH_SIZE=1500
+            BATCH_SIZE=2000
             self._cooccurance_matrix_placeholder = tf.placeholder(dtype=tf.float32, shape=[total_phrases, total_phrases])
             self._cooccurance_matrix = tf.Variable(self._cooccurance_matrix_placeholder, trainable=False)
 
@@ -80,7 +83,7 @@ class GloVeModel:
 
 
             #Build the model
-            EMBEDDING_SIZE=300
+            EMBEDDING_SIZE=250
             self._word_embeddings_target = tf.Variable(
                 tf.random_uniform([total_phrases, EMBEDDING_SIZE], -1.0, 1.0),
                 name="WordEmbeddingsMatrixTarget"
@@ -135,7 +138,7 @@ class GloVeModel:
             self._word_embeddings = self._word_embeddings_target + self._word_embeddings_context
             print(self._word_embeddings.shape)
 
-            self._optimizer = WitchcraftAdamOptimizer(0.001).to_tf_optimizer().minimize(self._loss)
+            self._optimizer = WitchcraftAdagradOptimizer(0.05).to_tf_optimizer().minimize(self._loss)
             self._summary = tf.summary.scalar("loss", self._loss)
             self._writer = tf.summary.FileWriter('./logs/' + "glove", self._session.graph)
 
@@ -151,7 +154,7 @@ class GloVeModel:
 
             self._writer.add_summary(calc_summary, global_step=global_step)
 
-            if global_step % 100 == 0:
+            if global_step % 50 == 0:
                 print("LAST LOSS: " + str(loss))
                 self._saver.save(self._session, './logs/' + "glove" + '.ckpt', global_step)
 
