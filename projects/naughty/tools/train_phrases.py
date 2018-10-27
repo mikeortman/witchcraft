@@ -1,26 +1,13 @@
 from sys import argv
-from multiprocessing import Pool
 from typing import Optional, List
 
 from witchcraft.util.protobuf import protobufs_from_filestream
-from witchcraft.ml.models.word2vec import Word2VecVocabBuilder, Word2VecVocab, Word2VecHyperparameters, Word2VecModel
-from witchcraft.ml.models.glove import GloVeModel
+# from witchcraft.ml.models.word2vec import Word2VecVocabBuilder, Word2VecVocab, Word2VecHyperparameters, Word2VecModel
+from witchcraft.ml.models.glove import GloVeModel, GloVeHyperparameters
 from witchcraft.ml.optimizers import WitchcraftAdagradOptimizer
 from projects.naughty.protos.naughty_pb2 import UrbanDictionaryDefinition as UrbanDictionaryDefinitionProto
 from projects.naughty.definition import UrbanDictionaryDefinition
 from witchcraft.nlp.datatypes import Document, Corpus
-
-
-hyperparameters = Word2VecHyperparameters()\
-    .set_max_vocab_size(45000)\
-    .set_min_word_count(10)\
-    .set_optimizer(WitchcraftAdagradOptimizer(learning_rate=0.75))\
-    .set_batch_size(64)\
-    .set_negative_sample_count(64)\
-    .enable_ngram(min_count=30, max_ngram_size=4)\
-    .set_name("win")
-
-vocab: Optional[Word2VecVocab] = Word2VecVocab.load_metadata_from_disk(hyperparameters=hyperparameters)
 
 
 def corpus_from_files(files: List[str]):
@@ -34,6 +21,17 @@ def corpus_from_files(files: List[str]):
                 docs += [definition.get_word(), definition.get_definition()]
 
     return Corpus(docs)
+
+# hyperparameters = Word2VecHyperparameters()\
+#     .set_max_vocab_size(45000)\
+#     .set_min_word_count(10)\
+#     .set_optimizer(WitchcraftAdagradOptimizer(learning_rate=0.75))\
+#     .set_batch_size(64)\
+#     .set_negative_sample_count(64)\
+#     .enable_ngram(min_count=30, max_ngram_size=4)\
+#     .set_name("win")
+#
+# vocab: Optional[Word2VecVocab] = Word2VecVocab.load_metadata_from_disk(hyperparameters=hyperparameters)
 
 # if vocab is None:
 #     print ("Vocab hasn't been built yet. Building.")
@@ -54,8 +52,28 @@ def corpus_from_files(files: List[str]):
 #     hyperparameters=hyperparameters
 # )
 
+# for filename in argv[1:]:
+#     with open(filename, 'rb') as fin:
+#         for pb_str in protobufs_from_filestream(fin):
+#             pb = UrbanDictionaryDefinitionProto.FromString(pb_str)
+#             definition = UrbanDictionaryDefinition.from_protobuf(pb)
+#             vocab.get_skipgrams_for_sequence(definition.get_definition_sequence())
+
+
 print("Building")
-model: GloVeModel = GloVeModel(corpus=corpus_from_files(argv[1:]))
+
+hyperparameters: GloVeHyperparameters = GloVeHyperparameters()\
+    .set_name("glove_test")\
+    .set_embedding_size(300)\
+    .set_batch_size(1000)\
+    .set_window_size(5)\
+    .set_loss_weight_alpha(0.75)\
+    .set_loss_weight_xmax(100)\
+    .set_min_word_count(25)\
+    .set_max_vocab_size(30000)\
+    .set_optimizer(WitchcraftAdagradOptimizer(0.5))
+
+model: GloVeModel = GloVeModel(corpus=corpus_from_files(argv[1:]), hyperparameters=hyperparameters)
 
 print("Training")
 i = 0
@@ -66,10 +84,3 @@ while True:
     if i % 500 == 0:
         print (str(i))
         model.save_embeddings("win_" + str(i) + ".embeddings")
-
-# for filename in argv[1:]:
-#     with open(filename, 'rb') as fin:
-#         for pb_str in protobufs_from_filestream(fin):
-#             pb = UrbanDictionaryDefinitionProto.FromString(pb_str)
-#             definition = UrbanDictionaryDefinition.from_protobuf(pb)
-#             vocab.get_skipgrams_for_sequence(definition.get_definition_sequence())
