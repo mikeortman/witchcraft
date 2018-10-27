@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import math
 
 from witchcraft.nlp.datatypes import Corpus
 from witchcraft.ml.datasets import WitchcraftDatasetIntegerRange
@@ -59,7 +60,7 @@ class GloVeModel:
 
                     source_idx = self._phrase_id_map[source.to_phrase_normalized()]
                     target_idx = self._phrase_id_map[target.to_phrase_normalized()]
-                    self._cooccurance_matrix_arr[source_idx, target_idx] += 1.0 / distance
+                    self._cooccurance_matrix_arr[source_idx, target_idx] += 1.0 / math.sqrt(distance)
 
             i += 1
             if i % 1000 == 0:
@@ -69,7 +70,7 @@ class GloVeModel:
 
         print("Building TF graph")
         with self._graph.as_default():
-            BATCH_SIZE=500
+            BATCH_SIZE=1500
             self._cooccurance_matrix_placeholder = tf.placeholder(dtype=tf.float32, shape=[total_phrases, total_phrases])
             self._cooccurance_matrix = tf.Variable(self._cooccurance_matrix_placeholder, trainable=False)
 
@@ -134,7 +135,7 @@ class GloVeModel:
             self._word_embeddings = self._word_embeddings_target + self._word_embeddings_context
             print(self._word_embeddings.shape)
 
-            self._optimizer = WitchcraftAdamOptimizer(0.75).to_tf_optimizer().minimize(self._loss)
+            self._optimizer = WitchcraftAdamOptimizer(0.001).to_tf_optimizer().minimize(self._loss)
             self._summary = tf.summary.scalar("loss", self._loss)
             self._writer = tf.summary.FileWriter('./logs/' + "glove", self._session.graph)
 
