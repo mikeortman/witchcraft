@@ -259,6 +259,8 @@ class Sentence:
 
         for i in range(sentence_size):
             current_phrase = valid_phrases[i]
+            yield (current_phrase, current_phrase, 0)
+
             if current_phrase is None:
                 continue
 
