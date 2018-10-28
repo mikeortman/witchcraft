@@ -71,7 +71,7 @@ hyperparameters: GloVeHyperparameters = GloVeHyperparameters()\
     .set_min_word_count(20)\
     .set_max_vocab_size(30000)\
     .set_optimizer(WitchcraftAdagradOptimizer(1.0))\
-    .set_distance_weight_function(lambda d: 1.0 / abs(1+d))
+    .set_distance_weight_function(lambda d: 1.0 / (1+abs(d)))
 
 model: GloVeModel = GloVeModel(corpus=corpus_from_files(argv[1:]), hyperparameters=hyperparameters)
 
