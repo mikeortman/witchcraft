@@ -157,12 +157,6 @@ class GloVeModel:
             if i % 1000 == 0:
                 print ("Done with document " + str(i))
 
-        with open('blah.txt', 'w') as the_file:
-            for x in range(total_phrases):
-                for y in range(total_phrases):
-                    the_file.write(str(self._cooccurance_matrix_arr[x,y]) + '\n')
-
-
         print("Building TF graph")
         with self._graph.as_default():
 

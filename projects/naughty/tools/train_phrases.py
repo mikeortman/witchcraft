@@ -67,7 +67,7 @@ hyperparameters: GloVeHyperparameters = GloVeHyperparameters()\
     .set_embedding_size(300)\
     .set_batch_size(1000)\
     .set_loss_weight_alpha(0.75)\
-    .set_loss_weight_xmax(100)\
+    .set_loss_weight_xmax(50)\
     .set_min_word_count(20)\
     .set_max_vocab_size(30000)\
     .set_optimizer(WitchcraftAdagradOptimizer(1.0))\
