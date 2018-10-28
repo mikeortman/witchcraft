@@ -66,13 +66,12 @@ hyperparameters: GloVeHyperparameters = GloVeHyperparameters()\
     .set_name("glove_test_const")\
     .set_embedding_size(300)\
     .set_batch_size(1000)\
-    .set_window_size(3)\
     .set_loss_weight_alpha(0.75)\
     .set_loss_weight_xmax(100)\
-    .set_min_word_count(25)\
+    .set_min_word_count(20)\
     .set_max_vocab_size(30000)\
-    .set_optimizer(WitchcraftAdagradOptimizer(0.5))\
-    .set_distance_weight_function(lambda d: 1.0)
+    .set_optimizer(WitchcraftAdagradOptimizer(1.0))\
+    .set_distance_weight_function(lambda d: 1.0 / abs(1+d))
 
 model: GloVeModel = GloVeModel(corpus=corpus_from_files(argv[1:]), hyperparameters=hyperparameters)
 

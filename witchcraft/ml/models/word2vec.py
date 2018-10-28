@@ -154,7 +154,7 @@ class Word2VecVocab:
                 for (source, target, distance) in sentence.skipgrams(self._hyperparameters.get_skipgram_window_size()):
                     if distance is 0:
                         continue
-                        
+
                     source_idx = self.word_to_id(source.to_phrase_normalized())
                     target_idx = self.word_to_id(target.to_phrase_normalized())
 

@@ -157,6 +157,10 @@ class GloVeModel:
             if i % 1000 == 0:
                 print ("Done with document " + str(i))
 
+        with open('blah.txt', 'w') as the_file:
+            for x in range(total_phrases):
+                for y in range(total_phrases):
+                    the_file.write(str(self._cooccurance_matrix_arr[x,y]) + '\n')
 
 
         print("Building TF graph")
@@ -188,7 +192,7 @@ class GloVeModel:
 
             self._word_embeddings_context = tf.Variable(
                 tf.random_uniform([total_phrases, self._hyperparameters.get_embedding_size()], -1.0, 1.0),
-                name="WordEmbeddingsMatriContext"
+                name="WordEmbeddingsMatrixContext"
             )
 
 
