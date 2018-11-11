@@ -4,6 +4,8 @@ from typing import Optional, List
 from witchcraft.util.protobuf import protobufs_from_filestream
 # from witchcraft.ml.models.word2vec import Word2VecVocabBuilder, Word2VecVocab, Word2VecHyperparameters, Word2VecModel
 from witchcraft.ml.models.glove import GloVeModel, GloVeHyperparameters
+from witchcraft.ml.models.fasttext import FastTextModel
+
 from witchcraft.ml.optimizers import WitchcraftAdagradOptimizer
 from projects.naughty.protos.naughty_pb2 import UrbanDictionaryDefinition as UrbanDictionaryDefinitionProto
 from projects.naughty.definition import UrbanDictionaryDefinition
@@ -62,18 +64,21 @@ def corpus_from_files(files: List[str]):
 
 print("Building")
 
-hyperparameters: GloVeHyperparameters = GloVeHyperparameters()\
-    .set_name("glove_test_const")\
-    .set_embedding_size(300)\
-    .set_batch_size(1000)\
-    .set_loss_weight_alpha(0.75)\
-    .set_loss_weight_xmax(50)\
-    .set_min_word_count(20)\
-    .set_max_vocab_size(30000)\
-    .set_optimizer(WitchcraftAdagradOptimizer(1.0))\
-    .set_distance_weight_function(lambda d: 1.0 / (1+abs(d)))
+# hyperparameters: GloVeHyperparameters = GloVeHyperparameters()\
+#     .set_name("glove_test_const")\
+#     .set_embedding_size(300)\
+#     .set_batch_size(36)\
+#     .set_loss_weight_alpha(0.75)\
+#     .set_loss_weight_xmax(50)\
+#     .set_min_word_count(20)\
+#     .set_max_vocab_size(30000)\
+#     .set_optimizer(WitchcraftAdagradOptimizer(1.0))\
+#     .set_distance_weight_function(lambda d: 1.0 / (1+abs(d)))
+#
+# model: GloVeModel = GloVeModel(corpus=corpus_from_files(argv[1:]), hyperparameters=hyperparameters)
 
-model: GloVeModel = GloVeModel(corpus=corpus_from_files(argv[1:]), hyperparameters=hyperparameters)
+
+model: FastTextModel = FastTextModel(corpus=corpus_from_files(argv[1:]))
 
 print("Training")
 i = 0
@@ -81,6 +86,8 @@ while True:
     model.train(i)
     i += 1
 
-    if i % 500 == 0:
-        print (str(i))
-        model.save_embeddings("glove_test_const_" + str(i) + ".embeddings")
+    if i % 5000 == 0:
+        model.save_embeddings("fastext_model_" + str(i) + ".embeddings")
+
+    if i % 1000 == 0:
+        print(i)

@@ -1,14 +1,15 @@
-from typing import Optional, Dict, List, Tuple, Generator
-import tensorflow as tf
-import os
+from typing import Optional, Dict, List
 from pathlib import Path
+import os
+
+import tensorflow as tf
 
 from witchcraft.ml.optimizers import Optimizer
 from witchcraft.ml.datasets import WitchcraftDataset
 from witchcraft.nlp.datatypes import Corpus
 from witchcraft.ml.datatypes import PhraseEmbedding
-from witchcraft.nlp.parse import cluster_phrases
 from witchcraft.util.protobuf import protobuf_to_filestream
+
 
 class Word2VecHyperparameters:
     def __init__(self) -> None:
@@ -147,7 +148,6 @@ class Word2VecVocab:
         current_writer_index = 0
         i = 0
         current_writer = tf.python_io.TFRecordWriter(self.get_skipgram_record_filename(current_writer_index))
-
 
         for document in corpus:
             for sentence in document:

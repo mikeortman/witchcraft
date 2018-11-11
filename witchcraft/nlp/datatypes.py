@@ -6,6 +6,8 @@ from witchcraft.nlp.protos.nlpdatatypes_pb2 import Phrase as PhraseProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import Sentence as SentenceProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import Document as DocumentProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordDependency as WordDependencyProto
+from witchcraft.util.hash import hash_fnv1a
+
 
 class PartOfSpeech:
     def __init__(self, pos: Optional[str] = None) -> None:
@@ -90,6 +92,7 @@ class Word:
                  word_dependency: Optional[WordDependency] = None) -> None:
         self._word: str = word
         self._word_normalized = self._word.strip().lower()
+        self._word_hash = hash_fnv1a(input_str=self._word_normalized, bucket_size=None)
 
         self._word_len: int = len(word)
         self._pos: PartOfSpeech = pos if pos is not None else PartOfSpeech()
@@ -99,7 +102,6 @@ class Word:
         self._shape: str = shape
         self._is_alpha_word: bool = is_alpha_word
         self._word_dependency: WordDependency = word_dependency if word_dependency is not None else WordDependency(0, 0)
-
 
     def get_word_string(self) -> str:
         return self._word
@@ -185,23 +187,39 @@ class Word:
 class Phrase:
     def __init__(self, words: Optional[List[Word]] = None) -> None:
         self._words: List[Word] = words if words is not None else []
+        self._phrase_str = ''.join(
+            [w.get_word_string() + w.get_whitespace_postfix() for w in self]
+        )
+
+        self._phrase_str_norm = ' '.join([w.get_word_string_normalized() for w in self])
+        self._phrase_hash = hash_fnv1a(input_str=self._phrase_str_norm, bucket_size=None)
+
+        self._provides_contextual_value = True
+        for word in self:
+            if not word.provides_contextual_value():
+                self._provides_contextual_value = False
+                break
 
     def __iter__(self):
         return iter(self._words)
 
     def __str__(self)-> str:
         # TODO: Make Faster
-        return ''.join(
-            [w.get_word_string() + w.get_whitespace_postfix() for w in self]
-        )
+        return self._phrase_str
 
     def to_phrase_normalized(self):
-        return ' '.join([w.get_word_string_normalized() for w in self])
+        return self._phrase_str_norm
 
     def to_protobuf(self) -> PhraseProto:
         return PhraseProto(
             words=[w.to_protobuf() for w in self]
         )
+
+    def get_hash(self, bucket_size: Optional[int] = None):
+        if bucket_size is not None:
+            return self._phrase_hash % bucket_size
+
+        return self._phrase_hash
 
     def is_word(self):
         return len(self._words) == 1
@@ -210,11 +228,7 @@ class Phrase:
         return [w.to_array() for w in self]
 
     def provides_contextual_value(self) -> bool:
-        for word in self:
-            if not word.provides_contextual_value():
-                return False
-
-        return True
+        return self._provides_contextual_value
 
     @classmethod
     def from_protobuf(cls, phrase_proto: PhraseProto) -> 'Phrase':
