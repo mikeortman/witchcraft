@@ -2,7 +2,7 @@ from typing import Optional
 
 import tensorflow as tf
 
-from witchcraft.ml.optimizers import WitchcraftAdagradOptimizer, Optimizer
+from witchcraft.ml.optimizers import WitchcraftAdamOptimizer, Optimizer
 from witchcraft.ml.datasets import WitchcraftDataset
 from witchcraft.nlp.datatypes import Corpus
 from witchcraft.ml.datatypes import PhraseEmbedding
@@ -14,7 +14,7 @@ class FastTextHyperparameters:
         self._batch_size: int = 64
         self._window_size: int = 4
         self._subsample_threshold: Optional[float] = None
-        self._optimizer: Optimizer = WitchcraftAdagradOptimizer(learning_rate=1.5)
+        self._optimizer: Optimizer = WitchcraftAdamOptimizer(learning_rate=0.001)
         self._name: Optional[str] = None
 
     def set_embedding_size(self, embedding_size: int) -> 'FastTextHyperparameters':
@@ -202,7 +202,7 @@ class FastTextModel:
         with self._graph.as_default():
             self._dataset = FastTextCorpusDataset(corpus, self._vocab)
             self._dataset = self._dataset.repeat()
-            self._dataset = self._dataset.shuffle(shuffle_buffer=100000)
+            # self._dataset = self._dataset.shuffle(shuffle_buffer=100000)
             self._dataset = self._dataset.batch(batch_size=self._hyperparameters.get_batch_size())
             self._dataset = self._dataset.prefetch(buffer_size=100000)
 
@@ -227,40 +227,59 @@ class FastTextModel:
                 tf.random_uniform([self._vocab.get_vocab_size(), self._hyperparameters.get_embedding_size()], -1.0, 1.0),
             )
 
-            def build_phrase_vector(ngram_batch, phrase_label_batch):
+            def build_phrase_vector(ngram_batch):
                 with tf.variable_scope("phrase_vector", reuse=tf.AUTO_REUSE):
                     #Right now, this just a bag-of-means on the ngrams... cool stuff next if this works.
                     current_phrase_ngram_embeddings = tf.gather(self._ngram_embeddings, ngram_batch)
                     embedding_mask = tf.maximum(tf.sign(ngram_batch), 0) #Zero ids = 0, All non zero ids = 1. To mask out nils.
                     phrase_lens = tf.reduce_sum(embedding_mask, axis=-1)
-                    gru_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
-                    gru_outputs, gru_state = tf.nn.dynamic_rnn(gru_cell, current_phrase_ngram_embeddings, sequence_length=phrase_lens, dtype=tf.float32)
+                    gru_cell_fw = tf.nn.rnn_cell.GRUCell(embedding_size)
+                    gru_cell_bw = tf.nn.rnn_cell.GRUCell(embedding_size)
 
+                    (output_fw, output_bw), gru_state = tf.nn.bidirectional_dynamic_rnn(gru_cell_fw, gru_cell_bw, current_phrase_ngram_embeddings, sequence_length=phrase_lens, dtype=tf.float32)
+                    gru_outputs = output_fw + output_bw
+                    # gru_outputs = tf.Print(gru_outputs, [gru_outputs], "GO")
+
+                    print(("GO", gru_outputs))
                     #3 layer NN on the RNN outputs
-                    attention = tf.layers.dense(gru_outputs, embedding_size)
-                    attention = tf.layers.dense(attention, embedding_size)
-                    attention = tf.layers.dense(attention, 1)
+                    attention = tf.layers.dense(gru_outputs, embedding_size, activation=tf.nn.tanh)
+                    # print(("A1", attention))
+                    attention = tf.layers.dense(attention, embedding_size, activation=tf.nn.tanh)
+                    # print(("A2", attention))
+                    attention = tf.layers.dense(attention, 1, activation=tf.nn.sigmoid)
+                    print(("A3", attention))
+                    # attention = tf.Print(attention, [attention], "AT")
+
 
                     #Masked softmax
                     attention = tf.exp(attention)
+                    print(("A4", attention))
+                    print(("A4.5", tf.cast(tf.expand_dims(embedding_mask, axis=-1), tf.float32)))
                     attention = attention * tf.cast(tf.expand_dims(embedding_mask, axis=-1), tf.float32)
-                    attention_sum = tf.reduce_sum(attention, axis=-1, keepdims=True)
+                    print(("A5", attention))
+                    attention_sum = tf.reduce_sum(attention, axis=-2, keepdims=True)
+                    print(("AS1", attention_sum))
                     attention_sum = tf.maximum(attention_sum, 1e-9)
+                    print(("AS2", attention_sum))
                     attention = attention / attention_sum
+                    print(("A6", attention))
+                    attention = tf.Print(attention, [attention], "AT")
 
-                    return tf.reduce_sum(current_phrase_ngram_embeddings * attention, axis=-2)
+                    embed_final = tf.reduce_sum(current_phrase_ngram_embeddings * attention, axis=-2)
+                    print(("E", embed_final))
+                    return embed_final, attention
 
 
                     # phrase_embedding = tf.gather(self._phrase_embeddings, phrase_label_batch)
                     # return phrase_embedding #tf.concat(phrase_by_ngram_embedding, phrase_embedding)
 
 
-            target_phrase_embeddings = build_phrase_vector(target_phrase_ngram_ids, target_phrase_label)
+            target_phrase_embeddings, _ = build_phrase_vector(target_phrase_ngram_ids)
 
             #Used for evaluating
-            # self._placeholder_phrase_ngram_ids = tf.placeholder(shape=[MAX_PHRASE_LEN], dtype=tf.int32)
-            # self._gen_embedding = build_phrase_vector(tf.expand_dims(self._placeholder_phrase_ngram_ids, axis=0))
-            # self._gen_embedding = tf.squeeze(self._gen_embedding)
+            self._placeholder_phrase_ngram_ids = tf.placeholder(shape=[MAX_PHRASE_LEN], dtype=tf.int32)
+            self._gen_embedding, self._gen_attention = build_phrase_vector(tf.expand_dims(self._placeholder_phrase_ngram_ids, axis=0))
+            self._gen_embedding = tf.squeeze(self._gen_embedding)
 
             # context_phrase_embeddings += tf.gather(self._vocab_embedding_matrix, target_phrase_label)
 
@@ -318,14 +337,21 @@ class FastTextModel:
     def save_embeddings(self, filename: str) -> None:
         print("Starting to save...")
 
-        # phrase_embeddings = list(self._session.run(self._phrase_embeddings))
-        # with open(filename, 'wb') as fout:
-        #     i = 0
-        #     for (phrase, count) in self._vocab:
-        #         embedding_vector = phrase_embeddings[self._vocab.phrase_to_id(phrase)]
-        #         embedding_proto = PhraseEmbedding(phrase, count, embedding_vector).to_protobuf()
-        #         protobuf_to_filestream(fout, embedding_proto.SerializeToString())
-        #         i += 1
+        with open(filename, 'wb') as fout:
+            i = 0
+            for (phrase, count) in self._vocab:
+                phrase_ngram_ids = self._vocab.create_phrase_ngram_ids(phrase)
+
+                phrase_embedding, phrase_attention = self._session.run([self._gen_embedding, self._gen_attention], {
+                    self._placeholder_phrase_ngram_ids: phrase_ngram_ids
+                })
+
+                # print((phrase, count, phrase_embedding, phrase_attention))
+
+                # embedding_proto = PhraseEmbedding(phrase, count, phrase_embedding).to_protobuf()
+                # protobuf_to_filestream(fout, embedding_proto.SerializeToString())
+                i += 1
 
         print("Done saving")
+
 
