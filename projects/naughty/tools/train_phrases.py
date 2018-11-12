@@ -86,8 +86,8 @@ while True:
     model.train(i)
     i += 1
 
-    # if i % 50 == 0:
-    #     model.save_embeddings("fastext_model_" + str(i) + ".embeddings")
+    if i % 5000 == 0:
+        model.save_embeddings("fastext_model_" + str(i) + ".embeddings")
 
     if i % 1000 == 0:
         print(i)

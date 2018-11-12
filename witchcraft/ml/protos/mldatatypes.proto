@@ -6,9 +6,15 @@ message Embedding {
     repeated double embedding_vector = 2;
 }
 
+message PhraseEmbeddingNgram {
+    required string ngram = 1;
+    optional float attention = 2;
+}
+
 message PhraseEmbedding {
     required Embedding embedding = 1;
     required string phrase = 2;
     required int32 count = 3;
+    repeated PhraseEmbeddingNgram ngrams = 4;
 }
 

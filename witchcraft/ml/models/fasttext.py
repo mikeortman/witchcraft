@@ -5,7 +5,7 @@ import tensorflow as tf
 from witchcraft.ml.optimizers import WitchcraftAdamOptimizer, Optimizer
 from witchcraft.ml.datasets import WitchcraftDataset
 from witchcraft.nlp.datatypes import Corpus
-from witchcraft.ml.datatypes import PhraseEmbedding
+from witchcraft.ml.datatypes import PhraseEmbedding, PhraseEmbeddingNgram
 from witchcraft.util.protobuf import protobuf_to_filestream
 
 class FastTextHyperparameters:
@@ -128,13 +128,13 @@ class FastTextVocab:
 
         ngram_ids = [ngram_id_lookup[n] for n in ngrams if n in ngram_id_lookup]
         if len(ngrams) != len(ngram_ids):
-            return None
+            return None, None
 
         #Concat/Expand to match correct shape
         ngram_ids = ngram_ids[:MAX_PHRASE_LEN]
         ngram_ids += [0] * (MAX_PHRASE_LEN - len(ngrams))
 
-        return ngram_ids
+        return ngram_ids, ngrams
 
 
 class FastTextCorpusDataset(WitchcraftDataset):
@@ -146,7 +146,7 @@ class FastTextCorpusDataset(WitchcraftDataset):
                     for phrase in sentence:
                         phrase_norm = phrase.to_phrase_normalized()
                         if phrase_norm not in current_doc_ngramid_set:
-                            ngram_ids = vocab.create_phrase_ngram_ids(phrase_norm)
+                            ngram_ids, _ = vocab.create_phrase_ngram_ids(phrase_norm)
                             if ngram_ids is None:
                                 continue
 
@@ -282,6 +282,7 @@ class FastTextModel:
             self._placeholder_phrase_ngram_ids = tf.placeholder(shape=[MAX_PHRASE_LEN], dtype=tf.int32)
             self._gen_embedding, self._gen_attention = build_phrase_vector(tf.expand_dims(self._placeholder_phrase_ngram_ids, axis=0))
             self._gen_embedding = tf.squeeze(self._gen_embedding)
+            self._gen_attention = tf.squeeze(self._gen_attention)
 
             # context_phrase_embeddings += tf.gather(self._vocab_embedding_matrix, target_phrase_label)
 
@@ -342,16 +343,25 @@ class FastTextModel:
         with open(filename, 'wb') as fout:
             i = 0
             for (phrase, count) in self._vocab:
-                phrase_ngram_ids = self._vocab.create_phrase_ngram_ids(phrase)
+                phrase_ngram_ids, phrase_ngrams = self._vocab.create_phrase_ngram_ids(phrase)
+
 
                 phrase_embedding, phrase_attention = self._session.run([self._gen_embedding, self._gen_attention], {
                     self._placeholder_phrase_ngram_ids: phrase_ngram_ids
                 })
 
+
+                n = 0
+                ngram_objs = []
+                for (ngram, ngram_id) in zip(phrase_ngrams, phrase_ngram_ids):
+                    attention = phrase_attention[n]
+                    ngram_objs += [PhraseEmbeddingNgram(ngram=ngram, attention=attention)]
+                    n += 1
+
                 # print((phrase, count, phrase_embedding, phrase_attention))
 
-                # embedding_proto = PhraseEmbedding(phrase, count, phrase_embedding).to_protobuf()
-                # protobuf_to_filestream(fout, embedding_proto.SerializeToString())
+                embedding_proto = PhraseEmbedding(phrase, count, phrase_embedding, ngrams=ngram_objs).to_protobuf()
+                protobuf_to_filestream(fout, embedding_proto.SerializeToString())
                 i += 1
 
         print("Done saving")

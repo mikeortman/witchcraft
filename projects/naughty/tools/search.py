@@ -1,7 +1,7 @@
 # Do a quick demo search.
 # Input is the embeddings file, args are words to look for nearest neighbors. For demo purposes
 from witchcraft.util.protobuf import protobufs_from_filestream
-from witchcraft.ml.datatypes import PhraseEmbedding
+from witchcraft.ml.datatypes import PhraseEmbedding, PhraseEmbeddingNgram
 from witchcraft.ml.protos.mldatatypes_pb2 import PhraseEmbedding as PhraseEmbeddingProto
 from witchcraft.ml.models.nearest_neighbor import NearestNeighborModel, NearestNeighborResult
 from witchcraft.nlp.parse import parse_string_to_document
@@ -42,12 +42,20 @@ def home():
         for phrase in sentence:
             phrase_norm: str = phrase.to_phrase_normalized()
             nearest: List[NearestNeighborResult] = []
+            ngrams: List[PhraseEmbeddingNgram] = []
             if phrase_norm in phrase_to_embedding:
                 nearest = search_model.lookup_nearby(phrase_to_embedding[phrase_norm], 10)
+                ngrams = phrase_to_embedding[phrase_norm].get_ngrams()
+
+            ngrams_dict = [{
+                'ngram': n.get_ngram(),
+                'attention': n.get_attention()
+            } for n in ngrams]
 
             sentence_json['phrases'] += [{
                 'phrase': str(phrase),
                 'norm': phrase_norm,
+                'ngrams': ngrams_dict,
                 'similar:': [{
                     'phrase': s.get_embedding().get_phrase(),
                     'strength': s.get_strength(),
