@@ -245,6 +245,8 @@ class FastTextModel:
                     attention = tf.layers.dense(gru_outputs, embedding_size*2, activation=tf.nn.tanh)
                     # print(("A1", attention))
                     attention = tf.layers.dense(attention, embedding_size, activation=tf.nn.tanh)
+                    attention = tf.layers.dense(attention, embedding_size, activation=tf.nn.tanh)
+                    attention = tf.layers.dense(attention, embedding_size / 2, activation=tf.nn.tanh)
                     # print(("A2", attention))
                     attention = tf.layers.dense(attention, 1, activation=tf.nn.sigmoid)
                     print(("A3", attention))
