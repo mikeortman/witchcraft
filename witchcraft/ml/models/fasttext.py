@@ -57,17 +57,24 @@ allowed_chars = 'abcdefghijklmnopqrstuvwxyz-\''
 ngram_id_lookup = {}
 
 i = 1 # i = 0 is a nil padding character
-for x in allowed_chars:
-    for y in allowed_chars:
-        ngram_id_lookup["<" + x + y] = i
-        i += 1
-
-        ngram_id_lookup[x + y + ">"] = i
-        i += 1
-
-        for z in allowed_chars:
-            ngram_id_lookup[x+y+z] = i
+for w in allowed_chars:
+    for x in allowed_chars:
+            ngram_id_lookup["<<" + w + x] = i
             i += 1
+
+            ngram_id_lookup[w + x + ">>"] = i
+            i += 1
+
+            for y in allowed_chars:
+                ngram_id_lookup["<" + w + x + y] = i
+                i += 1
+
+                ngram_id_lookup[w + x + y + ">"] = i
+                i += 1
+
+                for z in allowed_chars:
+                    ngram_id_lookup[w + x + y + z] = i
+                    i += 1
 
 print(ngram_id_lookup)
 
@@ -75,7 +82,7 @@ TOTAL_NGRAM_EMBEDDINGS = len(ngram_id_lookup) + 1 # +1 for nil (0)
 MAX_VOCAB_SIZE = 40000
 MIN_WORD_APPEARANCE = 10
 MAX_PHRASE_LEN = 32
-NGRAM_LENGTH = 3
+NGRAM_LENGTH = 4
 
 
 class FastTextVocab:
