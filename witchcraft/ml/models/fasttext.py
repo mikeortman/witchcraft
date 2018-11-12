@@ -346,22 +346,23 @@ class FastTextModel:
                 phrase_ngram_ids, phrase_ngrams = self._vocab.create_phrase_ngram_ids(phrase)
 
 
-                phrase_embedding, phrase_attention = self._session.run([self._gen_embedding, self._gen_attention], {
-                    self._placeholder_phrase_ngram_ids: phrase_ngram_ids
-                })
+                if phrase_ngram_ids is not None:
+                    phrase_embedding, phrase_attention = self._session.run([self._gen_embedding, self._gen_attention], {
+                        self._placeholder_phrase_ngram_ids: phrase_ngram_ids
+                    })
 
 
-                n = 0
-                ngram_objs = []
-                for (ngram, ngram_id) in zip(phrase_ngrams, phrase_ngram_ids):
-                    attention = phrase_attention[n]
-                    ngram_objs += [PhraseEmbeddingNgram(ngram=ngram, attention=attention)]
-                    n += 1
+                    n = 0
+                    ngram_objs = []
+                    for (ngram, ngram_id) in zip(phrase_ngrams, phrase_ngram_ids):
+                        attention = phrase_attention[n]
+                        ngram_objs += [PhraseEmbeddingNgram(ngram=ngram, attention=attention)]
+                        n += 1
 
-                # print((phrase, count, phrase_embedding, phrase_attention))
+                    # print((phrase, count, phrase_embedding, phrase_attention))
 
-                embedding_proto = PhraseEmbedding(phrase, count, phrase_embedding, ngrams=ngram_objs).to_protobuf()
-                protobuf_to_filestream(fout, embedding_proto.SerializeToString())
+                    embedding_proto = PhraseEmbedding(phrase, count, phrase_embedding, ngrams=ngram_objs).to_protobuf()
+                    protobuf_to_filestream(fout, embedding_proto.SerializeToString())
                 i += 1
 
         print("Done saving")
