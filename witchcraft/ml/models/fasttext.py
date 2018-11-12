@@ -240,8 +240,8 @@ class FastTextModel:
                     current_phrase_ngram_embeddings = tf.gather(self._ngram_embeddings, ngram_batch)
                     embedding_mask = tf.maximum(tf.sign(ngram_batch), 0) #Zero ids = 0, All non zero ids = 1. To mask out nils.
                     phrase_lens = tf.reduce_sum(embedding_mask, axis=-1)
-                    gru_cell_fw = tf.nn.rnn_cell.GRUCell(embedding_size*2)
-                    gru_cell_bw = tf.nn.rnn_cell.GRUCell(embedding_size*2)
+                    gru_cell_fw = tf.nn.rnn_cell.GRUCell(embedding_size)
+                    gru_cell_bw = tf.nn.rnn_cell.GRUCell(embedding_size)
 
                     (output_fw, output_bw), gru_state = tf.nn.bidirectional_dynamic_rnn(gru_cell_fw, gru_cell_bw, current_phrase_ngram_embeddings, sequence_length=phrase_lens, dtype=tf.float32)
                     gru_outputs = output_fw + output_bw
@@ -249,7 +249,7 @@ class FastTextModel:
 
                     print(("GO", gru_outputs))
                     #3 layer NN on the RNN outputs
-                    attention = tf.layers.dense(gru_outputs, embedding_size*2, activation=tf.nn.tanh)
+                    attention = tf.layers.dense(gru_outputs, embedding_size, activation=tf.nn.tanh)
                     # print(("A1", attention))
                     attention = tf.layers.dense(attention, embedding_size, activation=tf.nn.tanh)
                     attention = tf.layers.dense(attention, embedding_size, activation=tf.nn.tanh)
@@ -274,7 +274,7 @@ class FastTextModel:
                     print(("A6", attention))
                     attention = tf.Print(attention, [attention], "AT")
 
-                    embed_final = tf.reduce_sum(current_phrase_ngram_embeddings * attention, axis=-2)
+                    embed_final = tf.reduce_sum(gru_outputs * attention, axis=-2)
                     print(("E", embed_final))
                     return embed_final, attention
 
