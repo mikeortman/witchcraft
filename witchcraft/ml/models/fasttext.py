@@ -10,7 +10,7 @@ from witchcraft.util.protobuf import protobuf_to_filestream
 
 class FastTextHyperparameters:
     def __init__(self) -> None:
-        self._embedding_size: int = 100
+        self._embedding_size: int = 300
         self._batch_size: int = 64
         self._window_size: int = 4
         self._subsample_threshold: Optional[float] = None
@@ -208,7 +208,7 @@ class FastTextModel:
 
             (target_phrase_ngram_ids, target_phrase_label, context_phrase_labels) = self._dataset.to_tf_iterator().get_next()
 
-            # target_phrase_ngram_ids = tf.reshape(target_phrase_ngram_ids, [self._hyperparameters.get_batch_size(), MAX_PHRASE_LEN])
+            target_phrase_ngram_ids = tf.reshape(target_phrase_ngram_ids, [self._hyperparameters.get_batch_size(), MAX_PHRASE_LEN])
             # target_phrase_label = tf.reshape(target_phrase_label, [self._hyperparameters.get_batch_size()])
             # context_phrase_label = tf.reshape(context_phrase_label, [self._hyperparameters.get_batch_size()])
 
@@ -230,15 +230,29 @@ class FastTextModel:
             def build_phrase_vector(ngram_batch, phrase_label_batch):
                 with tf.variable_scope("phrase_vector", reuse=tf.AUTO_REUSE):
                     #Right now, this just a bag-of-means on the ngrams... cool stuff next if this works.
-                    # current_phrase_ngram_embeddings = tf.gather(self._ngram_embeddings, ngram_batch)
-                    # embedding_mask = tf.maximum(tf.sign(ngram_batch), 0) #Zero ids = 0, All non zero ids = 1. To mask out nils.
-                    # current_phrase_ngram_embeddings = current_phrase_ngram_embeddings * tf.cast(tf.expand_dims(embedding_mask, axis=-1), tf.float32)
-                    # current_phrase_ngram_embeddings = tf.reduce_sum(current_phrase_ngram_embeddings, axis=-2) #Sum down the features for each phrase in batch
-                    # total_phrase_ngrams = tf.maximum(tf.reduce_sum(embedding_mask, axis=-1,keepdims=True), 1) #Prevent divide by zero if that ever happens.
-                    #
-                    # phrase_by_ngram_embedding = current_phrase_ngram_embeddings / tf.cast(total_phrase_ngrams, tf.float32)
-                    phrase_embedding = tf.gather(self._phrase_embeddings, phrase_label_batch)
-                    return phrase_embedding #tf.concat(phrase_by_ngram_embedding, phrase_embedding)
+                    current_phrase_ngram_embeddings = tf.gather(self._ngram_embeddings, ngram_batch)
+                    embedding_mask = tf.maximum(tf.sign(ngram_batch), 0) #Zero ids = 0, All non zero ids = 1. To mask out nils.
+                    phrase_lens = tf.reduce_sum(embedding_mask, axis=-1)
+                    gru_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
+                    gru_outputs, gru_state = tf.nn.dynamic_rnn(gru_cell, current_phrase_ngram_embeddings, sequence_length=phrase_lens, dtype=tf.float32)
+
+                    #3 layer NN on the RNN outputs
+                    attention = tf.layers.dense(gru_outputs, embedding_size)
+                    attention = tf.layers.dense(attention, embedding_size)
+                    attention = tf.layers.dense(attention, 1)
+
+                    #Masked softmax
+                    attention = tf.exp(attention)
+                    attention = attention * tf.cast(tf.expand_dims(embedding_mask, axis=-1), tf.float32)
+                    attention_sum = tf.reduce_sum(attention, axis=-1, keepdims=True)
+                    attention_sum = tf.maximum(attention_sum, 1e-9)
+                    attention = attention / attention_sum
+
+                    return tf.reduce_sum(current_phrase_ngram_embeddings * attention, axis=-2)
+
+
+                    # phrase_embedding = tf.gather(self._phrase_embeddings, phrase_label_batch)
+                    # return phrase_embedding #tf.concat(phrase_by_ngram_embedding, phrase_embedding)
 
 
             target_phrase_embeddings = build_phrase_vector(target_phrase_ngram_ids, target_phrase_label)
@@ -304,14 +318,14 @@ class FastTextModel:
     def save_embeddings(self, filename: str) -> None:
         print("Starting to save...")
 
-        phrase_embeddings = list(self._session.run(self._phrase_embeddings))
-        with open(filename, 'wb') as fout:
-            i = 0
-            for (phrase, count) in self._vocab:
-                embedding_vector = phrase_embeddings[self._vocab.phrase_to_id(phrase)]
-                embedding_proto = PhraseEmbedding(phrase, count, embedding_vector).to_protobuf()
-                protobuf_to_filestream(fout, embedding_proto.SerializeToString())
-                i += 1
+        # phrase_embeddings = list(self._session.run(self._phrase_embeddings))
+        # with open(filename, 'wb') as fout:
+        #     i = 0
+        #     for (phrase, count) in self._vocab:
+        #         embedding_vector = phrase_embeddings[self._vocab.phrase_to_id(phrase)]
+        #         embedding_proto = PhraseEmbedding(phrase, count, embedding_vector).to_protobuf()
+        #         protobuf_to_filestream(fout, embedding_proto.SerializeToString())
+        #         i += 1
 
         print("Done saving")
 
