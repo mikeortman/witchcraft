@@ -202,7 +202,7 @@ class FastTextModel:
         with self._graph.as_default():
             self._dataset = FastTextCorpusDataset(corpus, self._vocab)
             self._dataset = self._dataset.repeat()
-            # self._dataset = self._dataset.shuffle(shuffle_buffer=100000)
+            self._dataset = self._dataset.shuffle(shuffle_buffer=100000)
             self._dataset = self._dataset.batch(batch_size=self._hyperparameters.get_batch_size())
             self._dataset = self._dataset.prefetch(buffer_size=100000)
 
