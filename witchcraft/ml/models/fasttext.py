@@ -7,6 +7,7 @@ from witchcraft.ml.datasets import WitchcraftDataset
 from witchcraft.nlp.datatypes import Corpus
 from witchcraft.ml.datatypes import PhraseEmbedding, PhraseEmbeddingNgram
 from witchcraft.util.protobuf import protobuf_to_filestream
+from witchcraft.util.listutil import skipgramify
 
 class FastTextHyperparameters:
     def __init__(self) -> None:
@@ -52,41 +53,31 @@ class FastTextHyperparameters:
     def get_optimizer(self) -> Optimizer:
         return self._optimizer
 
-
-allowed_chars = 'abcdefghijklmnopqrstuvwxyz-\''
-ngram_id_lookup = {}
-
-i = 1 # i = 0 is a nil padding character
-for w in allowed_chars:
-    for x in allowed_chars:
-            ngram_id_lookup["<<" + w + x] = i
-            i += 1
-
-            ngram_id_lookup[w + x + ">>"] = i
-            i += 1
-
-            for y in allowed_chars:
-                ngram_id_lookup["<" + w + x + y] = i
-                i += 1
-
-                ngram_id_lookup[w + x + y + ">"] = i
-                i += 1
-
-                for z in allowed_chars:
-                    ngram_id_lookup[w + x + y + z] = i
-                    i += 1
-
-print(ngram_id_lookup)
-
-TOTAL_NGRAM_EMBEDDINGS = len(ngram_id_lookup) + 1 # +1 for nil (0)
-MAX_VOCAB_SIZE = 40000
-MIN_WORD_APPEARANCE = 10
-MAX_PHRASE_LEN = 32
-NGRAM_LENGTH = 4
+TOTAL_NGRAM_EMBEDDINGS = 1 # +1 for nil (0)
+MAX_VOCAB_SIZE = 50000
+MIN_WORD_APPEARANCE = 5
+MAX_PHRASE_LEN = 20
+NGRAM_LENGTH = 3
 
 
 class FastTextVocab:
     def __init__(self, corpus: Corpus) -> None:
+        allowed_chars = 'abcdefghijklmnopqrstuvwxyz'
+        self.ngram_id_lookup = {}
+
+        i = 1  # i = 0 is a nil padding character
+        for x in allowed_chars:
+            for y in allowed_chars:
+                self.ngram_id_lookup["<" + x + y] = i
+                i += 1
+
+                self.ngram_id_lookup[x + y + ">"] = i
+                i += 1
+
+                for z in allowed_chars:
+                    self.ngram_id_lookup[x + y + z] = i
+                    i += 1
+
         i = 0
         self._vocab_counts = {}
         for document in corpus:
@@ -107,89 +98,115 @@ class FastTextVocab:
 
         self._vocab_counts = [(w, c) for w, c in self._vocab_counts.items() if c >= MIN_WORD_APPEARANCE]
         self._vocab_counts = sorted(self._vocab_counts, key=lambda a: -a[1])
-        self._vocab_counts = self._vocab_counts[:MAX_VOCAB_SIZE]
-        self._vocab_size = len(self._vocab_counts)
-        self._vocab_to_id = {}
-        print(self._vocab_counts[:20])
+        self._vocab_counts = self._vocab_counts[:MAX_VOCAB_SIZE - 1]
 
-        i = 0
+        i = 1
+        self._vocab_to_id = {"[NOP]": 0}
         for (w, c) in self._vocab_counts:
             self._vocab_to_id[w] = i
+            i += 1
+
+
+        self._ngram_counts = {}
+        for (phrase, _) in self._vocab_counts:
+            for ngram in self.create_phrase_ngrams(phrase):
+                if ngram not in self._ngram_counts:
+                    self._ngram_counts[ngram] = 0
+
+                self._ngram_counts[ngram] += 1
+
+        self._ngram_counts = [(w, c) for w, c in self._ngram_counts.items()]
+        self._ngram_counts = sorted(self._ngram_counts, key=lambda a: -a[1])
+        print(self._ngram_counts[:500])
+        print(len(self._ngram_counts))
+
+        self._ngram_to_id = {"[NOP]": 0}
+        self._id_to_ngram = ["[NOP]"]
+
+        i = 1
+        for (ngram, _) in self._ngram_counts:
+            self._ngram_to_id[ngram] = i # 0 is NOP
+            self._id_to_ngram += [ngram]
             i += 1
 
     def __iter__(self):
         return iter(self._vocab_counts)
 
+    def get_ngrams(self):
+        return iter(self._id_to_ngram)
+
     def phrase_to_id(self, phrase):
         return self._vocab_to_id[phrase] if phrase in self._vocab_to_id else None
 
     def get_vocab_size(self):
-        return self._vocab_size
+        return len(self._vocab_to_id)
 
-    def create_phrase_ngram_ids(self, phrase):
+    def get_ngrams_size(self):
+        return len(self._ngram_to_id)
+
+    def create_phrase_ngrams(self, phrase):
         phrase = "<" + phrase + ">"
         ngrams = []
         #chunk into ngrams.
         for i in range(len(phrase) - NGRAM_LENGTH + 1):
             ngrams += [phrase[i:i+NGRAM_LENGTH]]
 
-        ngram_ids = [ngram_id_lookup[n] for n in ngrams if n in ngram_id_lookup]
-        if len(ngrams) != len(ngram_ids):
-            return None, None
+        return ngrams
 
-        #Concat/Expand to match correct shape
-        ngram_ids = ngram_ids[:MAX_PHRASE_LEN]
-        ngram_ids += [0] * (MAX_PHRASE_LEN - len(ngrams))
+    def create_phrase_ngrams_by_id(self, phrase, max_ngrams):
+        current_phrase_ngrams = self.create_phrase_ngrams(phrase)
+        current_phrase_ngram_ids = [self._ngram_to_id[ngram] for ngram in current_phrase_ngrams if ngram in self._ngram_to_id]
+        if len(current_phrase_ngrams) != len(current_phrase_ngram_ids):
+            return None
 
-        return ngram_ids, ngrams
+        # #Concat/Expand to match correct shape
+        current_phrase_ngram_ids = current_phrase_ngram_ids[:max_ngrams]
+        current_phrase_ngram_ids += [0] * (max_ngrams - len(current_phrase_ngrams))
+        return current_phrase_ngram_ids
+
+    def save_ngrams_tsv(self):
+        with open("ngrams.tsv", "w") as f:
+            for ngram in self._id_to_ngram:
+                f.write(ngram + "\n")
 
 
-class FastTextCorpusDataset(WitchcraftDataset):
+class FastTextVocabNgramDataset(WitchcraftDataset):
+    def __init__(self, vocab: FastTextVocab) -> None:
+        def gen():
+            for (phrase, phrase_count) in vocab:
+                ngram_arr = vocab.create_phrase_ngrams_by_id(phrase, MAX_PHRASE_LEN)
+                if ngram_arr is None:
+                    continue
+
+                skipgrams = skipgramify(ngram_arr, 10)
+                if skipgrams is not None:
+                    # print(skipgrams)
+                    for skipgram in skipgrams:
+                        yield skipgram
+
+        super(FastTextVocabNgramDataset, self).__init__(tf.data.Dataset.from_generator(gen, (tf.int32, tf.int32, tf.int32)))
+
+
+class FastTextVocabCorpusDataset(WitchcraftDataset):
     def __init__(self, corpus: Corpus, vocab: FastTextVocab) -> None:
         def gen():
-            for document in corpus:
-                current_doc_ngramid_set = {}
-                for sentence in document:
-                    for phrase in sentence:
-                        phrase_norm = phrase.to_phrase_normalized()
-                        if phrase_norm not in current_doc_ngramid_set:
-                            ngram_ids, _ = vocab.create_phrase_ngram_ids(phrase_norm)
-                            if ngram_ids is None:
-                                continue
+            for doc in corpus:
+                for sentence in doc:
+                    phrases = [p for p in sentence if vocab.phrase_to_id(p.to_phrase_normalized()) is not None]
+                    if len(phrases) <= 1:
+                        continue
 
-                            current_doc_ngramid_set[phrase_norm] = ngram_ids
+                    phrases = [vocab.phrase_to_id(p.to_phrase_normalized()) for p in phrases]
+                    phrases = phrases[:MAX_PHRASE_LEN]
+                    phrases += [0] * (MAX_PHRASE_LEN - len(phrases))
 
-                for sentence in document:
-                    target_map = {}
-                    for (target, context, distance) in sentence.skipgrams(5):
-                        if distance == 0:
+                    for (target, context, distance) in skipgramify(phrases, 5):
+                        if target == 0 or context == 0 or distance == 0:
                             continue
 
-                        context_norm = context.to_phrase_normalized()
-                        target_norm = target.to_phrase_normalized()
+                        yield (target, context, distance)
 
-                        if context_norm == target_norm:
-                            continue
-
-                        context_id = vocab.phrase_to_id(context_norm)
-                        target_id = vocab.phrase_to_id(target_norm)
-
-                        if context_id is None or target_id is None or target_norm not in current_doc_ngramid_set:
-                            continue
-
-                        if target_id not in target_map:
-                            target_map[target_id] = {
-                                'context_ids': [],
-                                'norm': target_norm
-                            }
-
-                        target_map[target_id]['context_ids'] += [context_id]
-
-                    for target_id, metadata in target_map.items():
-                        target = current_doc_ngramid_set[metadata['norm']]
-                        yield (target, target_id, (metadata['context_ids'] * 5)[:5])
-
-        super(FastTextCorpusDataset, self).__init__(tf.data.Dataset.from_generator(gen, (tf.int32, tf.int32, tf.int32), (tf.TensorShape([MAX_PHRASE_LEN]), tf.TensorShape([]), tf.TensorShape([5]))))
+        super(FastTextVocabCorpusDataset, self).__init__(tf.data.Dataset.from_generator(gen, (tf.int32, tf.int32, tf.int32)))
 
 
 class FastTextModel:
@@ -205,172 +222,170 @@ class FastTextModel:
         self._session = tf.Session(graph=self._graph)
         self._corpus = corpus
         self._vocab = FastTextVocab(corpus=corpus)
+        self._vocab.save_ngrams_tsv()
 
         with self._graph.as_default():
-            self._dataset = FastTextCorpusDataset(corpus, self._vocab)
-            self._dataset = self._dataset.repeat()
-            self._dataset = self._dataset.shuffle(shuffle_buffer=100000)
-            self._dataset = self._dataset.batch(batch_size=self._hyperparameters.get_batch_size())
-            self._dataset = self._dataset.prefetch(buffer_size=100000)
+            with tf.variable_scope("NgramVectorization") as scope_ngram:
+                self._ngram_train_dataset = FastTextVocabNgramDataset(self._vocab)
+                self._ngram_train_dataset = self._ngram_train_dataset.repeat()
+                self._ngram_train_dataset = self._ngram_train_dataset.shuffle(shuffle_buffer=100000)
+                self._ngram_train_dataset = self._ngram_train_dataset.batch(batch_size=self._hyperparameters.get_batch_size())
+                self._ngram_train_dataset = self._ngram_train_dataset.prefetch(buffer_size=100000)
 
-            (target_phrase_ngram_ids, target_phrase_label, context_phrase_labels) = self._dataset.to_tf_iterator().get_next()
+                (target_ngrams, positive_ngram_context_labels, _) = self._ngram_train_dataset.to_tf_iterator().get_next()
+                positive_ngram_context_labels = tf.expand_dims(positive_ngram_context_labels, axis=-1, name="ExpandContextLabelIntoVector")
 
-            target_phrase_ngram_ids = tf.reshape(target_phrase_ngram_ids, [self._hyperparameters.get_batch_size(), MAX_PHRASE_LEN])
-            # target_phrase_label = tf.reshape(target_phrase_label, [self._hyperparameters.get_batch_size()])
-            # context_phrase_label = tf.reshape(context_phrase_label, [self._hyperparameters.get_batch_size()])
+                embedding_size = self._hyperparameters.get_embedding_size()
+                self._ngram_embeddings = tf.Variable(
+                    tf.random_uniform([self._vocab.get_ngrams_size(), embedding_size], -1.0, 1.0),
+                    name="NGramEmbeddings"
+                )
 
-            print(target_phrase_ngram_ids.shape)
-            print(target_phrase_label.shape)
-            print(context_phrase_labels.shape)
+                target_ngram_embeddings = tf.gather(self._ngram_embeddings, target_ngrams, name="TargetNGramEmbeddings")
 
-            # context_phrase_label = tf.expand_dims(context_phrase_label, axis=-1)
-            embedding_size = self._hyperparameters.get_embedding_size()
+                ngram_nce_weights = tf.Variable(
+                    tf.truncated_normal(
+                        [self._vocab.get_ngrams_size(), embedding_size],
+                        stddev=1.0 / embedding_size ** 0.5
+                    ),
+                    name="NoiseConstrastiveWeights"
+                )
 
-            self._ngram_embeddings = tf.Variable(
-                tf.random_uniform([TOTAL_NGRAM_EMBEDDINGS, self._hyperparameters.get_embedding_size()], -1.0, 1.0),
-            )
+                ngram_nce_bias = tf.Variable(tf.zeros([self._vocab.get_ngrams_size()]), name="NoiseConstrastiveBiases")
 
-            self._phrase_embeddings = tf.Variable(
-                tf.random_uniform([self._vocab.get_vocab_size(), self._hyperparameters.get_embedding_size()], -1.0, 1.0),
-            )
+                self._nce_ngram_loss_batch = tf.nn.nce_loss(
+                        weights=ngram_nce_weights,
+                        biases=ngram_nce_bias,
+                        labels=positive_ngram_context_labels,
+                        inputs=target_ngram_embeddings,
+                        num_sampled=64,
+                        num_classes=self._vocab.get_ngrams_size(),
+                        name="NoiseContrastiveLoss"
+                )
 
-            def build_phrase_vector(ngram_batch):
-                with tf.variable_scope("phrase_vector", reuse=tf.AUTO_REUSE):
-                    #Right now, this just a bag-of-means on the ngrams... cool stuff next if this works.
-                    current_phrase_ngram_embeddings = tf.gather(self._ngram_embeddings, ngram_batch)
-                    embedding_mask = tf.maximum(tf.sign(ngram_batch), 0) #Zero ids = 0, All non zero ids = 1. To mask out nils.
-                    phrase_lens = tf.reduce_sum(embedding_mask, axis=-1)
-                    gru_cell_fw = tf.nn.rnn_cell.GRUCell(embedding_size)
-                    gru_cell_bw = tf.nn.rnn_cell.GRUCell(embedding_size)
+                self._nce_ngram_loss = tf.reduce_sum(tf.square(self._nce_ngram_loss_batch))
+                self._summary_ngram_loss = tf.summary.scalar("ngram_loss_mean", tf.reduce_sum(self._nce_ngram_loss_batch) / self._hyperparameters.get_batch_size())
+                self._optimizer_ngram_loss = hyperparameters.get_optimizer().to_tf_optimizer()
+                self._minimize_ngram_loss = self._optimizer_ngram_loss.minimize(self._nce_ngram_loss, var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_ngram.name))
 
-                    (output_fw, output_bw), gru_state = tf.nn.bidirectional_dynamic_rnn(gru_cell_fw, gru_cell_bw, current_phrase_ngram_embeddings, sequence_length=phrase_lens, dtype=tf.float32)
-                    gru_outputs = output_fw + output_bw
-                    # gru_outputs = tf.Print(gru_outputs, [gru_outputs], "GO")
+            with tf.variable_scope("PhraseVectorization") as scope_phrase:
+                self._phrase_train_dataset = FastTextVocabCorpusDataset(self._corpus, self._vocab)
+                self._phrase_train_dataset = self._phrase_train_dataset.repeat()
+                self._phrase_train_dataset = self._phrase_train_dataset.shuffle(shuffle_buffer=100000)
+                self._phrase_train_dataset = self._phrase_train_dataset.batch(batch_size=self._hyperparameters.get_batch_size())
+                self._phrase_train_dataset = self._phrase_train_dataset.prefetch(buffer_size=100000)
+                (target_phrases, positive_phrases_context_labels, _) = self._phrase_train_dataset.to_tf_iterator().get_next()
 
-                    print(("GO", gru_outputs))
-                    #3 layer NN on the RNN outputs
-                    attention = tf.layers.dense(gru_outputs, embedding_size, activation=tf.nn.tanh)
-                    # print(("A1", attention))
-                    attention = tf.layers.dense(attention, embedding_size, activation=tf.nn.tanh)
-                    attention = tf.layers.dense(attention, embedding_size, activation=tf.nn.tanh)
-                    attention = tf.layers.dense(attention, embedding_size / 2, activation=tf.nn.tanh)
-                    # print(("A2", attention))
-                    attention = tf.layers.dense(attention, 1, activation=tf.nn.sigmoid)
-                    print(("A3", attention))
-                    # attention = tf.Print(attention, [attention], "AT")
+                target_phrases = tf.reshape(target_phrases, [self._hyperparameters.get_batch_size()], name="DefineTargetPhraseVector")
+                positive_phrases_context_labels = tf.reshape(positive_phrases_context_labels, [self._hyperparameters.get_batch_size(), 1], name="ExpandContextLabelIntoVector")
 
+                self._phrase_ngram_map_placeholder = tf.placeholder(dtype=tf.int32, shape=[self._vocab.get_vocab_size(), MAX_PHRASE_LEN])
+                self._phrase_ngram_map = tf.Variable(self._phrase_ngram_map_placeholder, dtype=tf.int32, trainable=False, name="PhraseToNGramMap")
 
-                    #Masked softmax
-                    attention = tf.exp(attention)
-                    print(("A4", attention))
-                    print(("A4.5", tf.cast(tf.expand_dims(embedding_mask, axis=-1), tf.float32)))
-                    attention = attention * tf.cast(tf.expand_dims(embedding_mask, axis=-1), tf.float32)
-                    print(("A5", attention))
-                    attention_sum = tf.reduce_sum(attention, axis=-2, keepdims=True)
-                    print(("AS1", attention_sum))
-                    attention_sum = tf.maximum(attention_sum, 1e-9)
-                    print(("AS2", attention_sum))
-                    attention = attention / attention_sum
-                    print(("A6", attention))
-                    attention = tf.Print(attention, [attention], "AT")
-
-                    embed_final = tf.reduce_sum(gru_outputs * attention, axis=-2)
-                    print(("E", embed_final))
-                    return embed_final, attention
+                target_phrase_ngram_maps = tf.gather(self._phrase_ngram_map, target_phrases)
+                target_phrase_ngram_embeddings = tf.gather(self._ngram_embeddings, target_phrase_ngram_maps)
 
 
-                    # phrase_embedding = tf.gather(self._phrase_embeddings, phrase_label_batch)
-                    # return phrase_embedding #tf.concat(phrase_by_ngram_embedding, phrase_embedding)
+
+                # Phrase lengths by counting non zero ngram ids
+                with tf.variable_scope("PhraseMaskGeneration"):
+                    phrase_length_mask = tf.sign(target_phrase_ngram_maps)
+                    phrase_length_mask = tf.maximum(phrase_length_mask, 0)
+
+                # MASKED ATTENTION
+                with tf.variable_scope("MaskedAttention"):
+                    flattened_phrase = tf.reshape(target_phrase_ngram_embeddings, [self._hyperparameters.get_batch_size(), -1])
+
+                    with tf.variable_scope("AttentionNeuralNetwork"):
+                        attention = tf.layers.dense(flattened_phrase, 300, activation=tf.tanh)
+                        attention = tf.layers.dense(attention, 128, activation=tf.tanh)
+                        attention = tf.layers.dense(attention, 20, activation=tf.tanh)
+                        attention = tf.squeeze(attention)
+
+                    with tf.variable_scope("AttentionMaskedSoftmax"):
+                        attention = tf.exp(attention)
+                        attention = attention * tf.cast(phrase_length_mask, tf.float32)
+                        attention_denom = tf.reduce_sum(attention, axis=-1, keepdims=True)
+                        attention_denom = tf.maximum(attention_denom, 1e-9)
+                        attention = attention / attention_denom
+
+                    with tf.variable_scope("AttentionOptimizedEmbeddingGen"):
+                        attention_optimized_outputs = target_phrase_ngram_embeddings * tf.expand_dims(attention, axis=-1)
+                        attention_optimized_outputs = tf.reduce_sum(attention_optimized_outputs, axis=-2)
 
 
-            target_phrase_embeddings, _ = build_phrase_vector(target_phrase_ngram_ids)
+                phrase_nce_weights = tf.Variable(
+                    tf.truncated_normal(
+                        [self._vocab.get_vocab_size(), embedding_size],
+                        stddev=1.0 / embedding_size ** 0.5
+                    ),
+                    name="NoiseConstrastiveWeights"
+                )
 
-            #Used for evaluating
-            self._placeholder_phrase_ngram_ids = tf.placeholder(shape=[MAX_PHRASE_LEN], dtype=tf.int32)
-            self._gen_embedding, self._gen_attention = build_phrase_vector(tf.expand_dims(self._placeholder_phrase_ngram_ids, axis=0))
-            self._gen_embedding = tf.squeeze(self._gen_embedding)
-            self._gen_attention = tf.squeeze(self._gen_attention)
+                phrase_nce_bias = tf.Variable(tf.zeros([self._vocab.get_vocab_size()]), name="NoiseConstrastiveBiases")
 
-            # context_phrase_embeddings += tf.gather(self._vocab_embedding_matrix, target_phrase_label)
-
-            nce_weights = tf.Variable(
-                tf.truncated_normal(
-                    [self._vocab.get_vocab_size(), embedding_size],
-                    stddev=1.0 / embedding_size ** 0.5
-                ),
-                name="NoiseConstrastiveWeights"
-            )
-
-            nce_bias = tf.Variable(tf.zeros([self._vocab.get_vocab_size()]), name="NoiseConstrastiveBiases")
-
-
-            self._nce_loss = tf.reduce_mean(
-                tf.nn.nce_loss(
-                    weights=nce_weights,
-                    biases=nce_bias,
-                    labels=context_phrase_labels,
-                    inputs=target_phrase_embeddings,
+                self._nce_phrase_loss_batch = tf.nn.nce_loss(
+                    weights=phrase_nce_weights,
+                    biases=phrase_nce_bias,
+                    labels=positive_phrases_context_labels,
+                    inputs=attention_optimized_outputs,
                     num_sampled=64,
-                    num_true=5,
-                    num_classes=self._vocab.get_vocab_size()
-                ),
-                name="MeanNCELoss"
-            )
+                    num_classes=self._vocab.get_vocab_size(),
+                    name="NoiseContrastiveLoss"
+                )
 
-            self._loss = self._nce_loss
+                self._nce_phrase_loss = tf.reduce_sum(tf.square(self._nce_phrase_loss_batch))
+                self._summary_phrase_loss = tf.summary.scalar("phrase_loss_mean", tf.reduce_sum(self._nce_phrase_loss_batch) / self._hyperparameters.get_batch_size())
+                self._optimizer_phrase_loss = hyperparameters.get_optimizer().to_tf_optimizer()
+                self._minimize_phrase_loss = self._optimizer_phrase_loss.minimize(self._nce_phrase_loss, var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_phrase.name))
 
+                # trainable_vars =  tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
+                # grads = tf.gradients(self._nce_phrase_loss, trainable_vars)
+                # grads, _ = tf.clip_by_global_norm(grads, 0.001)  # gradient clipping
+                # grads_and_vars = list(zip(grads, trainable_vars))
+                # self._minimize_phrase_loss = self._optimizer_phrase_loss.apply_gradients(grads_and_vars)
 
-            # print ("LOSS SHAPE: " + str(self._loss.shape))
-
-            self._optimizer = hyperparameters.get_optimizer().to_tf_optimizer()
-            self._minimize = self._optimizer.minimize(self._loss)
-
-            # grads = tf.gradients(self._loss, tf.trainable_variables())
-            # grads, _ = tf.clip_by_global_norm(grads, 0.5)  # gradient clipping
-            # grads_and_vars = list(zip(grads, tf.trainable_variables()))
-            # self._minimize = self._optimizer.apply_gradients(grads_and_vars)
-
-            self._summary_loss = tf.summary.scalar("loss", self._loss)
-            self._summary = tf.summary.merge([ self._summary_loss])
+            # self._summary = tf.summary.merge([ self._summary_ngram_loss, self._summary_phrase_loss])
             self._writer = tf.summary.FileWriter('./logs/' + self._hyperparameters.get_name(), self._session.graph)
-            self._session.run(tf.global_variables_initializer())
+
+            phrase_ngram_map_arr = []
+            phrase_ngram_map_arr += [[0] * MAX_PHRASE_LEN]
+
+            for (phrase, _) in self._vocab:
+                phrase_ngram_map_arr += [self._vocab.create_phrase_ngrams_by_id(phrase, MAX_PHRASE_LEN)]
+
+            print(phrase_ngram_map_arr)
+
+            self._session.run(tf.global_variables_initializer(), feed_dict={self._phrase_ngram_map_placeholder: phrase_ngram_map_arr})
+
             self._saver = tf.train.Saver()
 
     def train(self, global_step: int) -> None:
         with self._graph.as_default():
-            _, calc_summary = self._session.run([self._minimize, self._summary])
-            self._writer.add_summary(calc_summary, global_step=global_step)
+
+            if global_step <= 1000000:
+                _, calc_summary = self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss])
+                self._writer.add_summary(calc_summary, global_step=global_step)
+            else:
+                _, calc_summary = self._session.run([self._minimize_phrase_loss, self._summary_phrase_loss])
+                self._writer.add_summary(calc_summary, global_step=global_step)
 
             if global_step % 1000 == 0:
                 self._saver.save(self._session, './logs/' + self._hyperparameters.get_name() + '.ckpt', global_step)
 
     def save_embeddings(self, filename: str) -> None:
         print("Starting to save...")
+        with open(filename + ".ngrams.proto", 'wb') as fout:
+            ngrams = list(self._vocab.get_ngrams())
+            embeddings = self._session.run(self._ngram_embeddings)
 
-        with open(filename, 'wb') as fout:
-            i = 0
-            for (phrase, count) in self._vocab:
-                phrase_ngram_ids, phrase_ngrams = self._vocab.create_phrase_ngram_ids(phrase)
+            for i in range(len(ngrams)):
+                ngram = ngrams[i]
+                embedding = embeddings[i]
 
-
-                if phrase_ngram_ids is not None:
-                    phrase_embedding, phrase_attention = self._session.run([self._gen_embedding, self._gen_attention], {
-                        self._placeholder_phrase_ngram_ids: phrase_ngram_ids
-                    })
-
-
-                    n = 0
-                    ngram_objs = []
-                    for (ngram, ngram_id) in zip(phrase_ngrams, phrase_ngram_ids):
-                        attention = phrase_attention[n]
-                        ngram_objs += [PhraseEmbeddingNgram(ngram=ngram, attention=attention)]
-                        n += 1
-
-                    # print((phrase, count, phrase_embedding, phrase_attention))
-
-                    embedding_proto = PhraseEmbedding(phrase, count, phrase_embedding, ngrams=ngram_objs).to_protobuf()
-                    protobuf_to_filestream(fout, embedding_proto.SerializeToString())
-                i += 1
+                # Cheating... reusing phrase embedding for ngram embedding
+                embedding_proto = PhraseEmbedding(ngram, 0, embedding).to_protobuf()
+                protobuf_to_filestream(fout, embedding_proto.SerializeToString())
 
         print("Done saving")
 

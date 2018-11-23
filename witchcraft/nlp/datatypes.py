@@ -7,6 +7,7 @@ from witchcraft.nlp.protos.nlpdatatypes_pb2 import Sentence as SentenceProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import Document as DocumentProto
 from witchcraft.nlp.protos.nlpdatatypes_pb2 import WordDependency as WordDependencyProto
 from witchcraft.util.hash import hash_fnv1a
+from witchcraft.util.listutil import skipgramify
 
 
 class PartOfSpeech:
@@ -157,6 +158,18 @@ class Word:
             self.get_word_dependency().to_array()
         ]
 
+    def ngrams(self, ngram_len: int) -> List[str]:
+        word = "<" + self.get_word_string_normalized() + ">"
+        ngrams = []
+        # chunk into ngrams.
+        for i in range(len(word) - ngram_len + 1):
+            word += [word[i:i + ngram_len]]
+
+        return ngrams
+
+    def ngram_skipgrams(self, window_size: int, ngram_len: int) -> List[Tuple[str, str, int]]:
+        return skipgramify(self.ngrams(ngram_len), window_size)
+
     @classmethod
     def from_protobuf(cls, word_proto: WordProto) -> 'Word':
         return Word(
@@ -229,6 +242,13 @@ class Phrase:
 
     def provides_contextual_value(self) -> bool:
         return self._provides_contextual_value
+
+    def ngrams(self, ngram_len: int) -> List[str]:
+        all_ngrams = []
+        for word in self._words:
+            all_ngrams += word.ngrams(ngram_len)
+
+        return all_ngrams
 
     @classmethod
     def from_protobuf(cls, phrase_proto: PhraseProto) -> 'Phrase':

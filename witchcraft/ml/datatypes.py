@@ -13,7 +13,7 @@ class Embedding:
 
 
 class PhraseEmbedding(Embedding):
-    def __init__(self, phrase: str, count: int, vector: List[float], ngrams: Optional[List['PhraseEmbeddingNgram']]) -> None:
+    def __init__(self, phrase: str, count: int, vector: List[float], ngrams: Optional[List['PhraseEmbeddingNgram']] = None) -> None:
         Embedding.__init__(self, vector=vector)
         self._word = phrase
         self._count = count
