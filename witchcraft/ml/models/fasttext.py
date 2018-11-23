@@ -309,6 +309,8 @@ class FastTextModel:
                         attention_denom = tf.maximum(attention_denom, 1e-9)
                         attention = attention / attention_denom
 
+                    attention = tf.Print(attention, [attention], "AT")
+
                     with tf.variable_scope("AttentionOptimizedEmbeddingGen"):
                         attention_optimized_outputs = target_phrase_ngram_embeddings * tf.expand_dims(attention, axis=-1)
                         attention_optimized_outputs = tf.reduce_sum(attention_optimized_outputs, axis=-2)
