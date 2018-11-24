@@ -426,7 +426,7 @@ class FastTextModel:
     def train(self, global_step: int) -> None:
         with self._graph.as_default():
 
-            if global_step <= 2000:
+            if global_step <= 250000:
                 _, calc_summary = self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss])
                 self._writer.add_summary(calc_summary, global_step=global_step)
             else:
