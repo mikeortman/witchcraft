@@ -227,10 +227,9 @@ class FastTextModel:
         with self._graph.as_default():
             with tf.variable_scope("NgramVectorization") as scope_ngram:
                 self._ngram_train_dataset = FastTextVocabNgramDataset(self._vocab)
+                self._ngram_train_dataset = self._ngram_train_dataset.shuffle(shuffle_buffer=500000)
                 self._ngram_train_dataset = self._ngram_train_dataset.repeat()
-                self._ngram_train_dataset = self._ngram_train_dataset.shuffle(shuffle_buffer=100000)
                 self._ngram_train_dataset = self._ngram_train_dataset.batch(batch_size=self._hyperparameters.get_batch_size())
-                self._ngram_train_dataset = self._ngram_train_dataset.prefetch(buffer_size=100000)
 
                 (target_ngrams, positive_ngram_context_labels, _) = self._ngram_train_dataset.to_tf_iterator().get_next()
                 positive_ngram_context_labels = tf.expand_dims(positive_ngram_context_labels, axis=-1, name="ExpandContextLabelIntoVector")
@@ -270,10 +269,10 @@ class FastTextModel:
 
             with tf.variable_scope("PhraseVectorization") as scope_phrase:
                 self._phrase_train_dataset = FastTextVocabCorpusDataset(self._corpus, self._vocab)
+                self._phrase_train_dataset = self._phrase_train_dataset.shuffle(shuffle_buffer=500000)
                 self._phrase_train_dataset = self._phrase_train_dataset.repeat()
-                self._phrase_train_dataset = self._phrase_train_dataset.shuffle(shuffle_buffer=100000)
                 self._phrase_train_dataset = self._phrase_train_dataset.batch(batch_size=self._hyperparameters.get_batch_size())
-                self._phrase_train_dataset = self._phrase_train_dataset.prefetch(buffer_size=100000)
+                # self._phrase_train_dataset = self._phrase_train_dataset.prefetch(buffer_size=100000)
                 (target_phrases, positive_phrases_context_labels, _) = self._phrase_train_dataset.to_tf_iterator().get_next()
 
                 target_phrases = tf.reshape(target_phrases, [self._hyperparameters.get_batch_size()], name="DefineTargetPhraseVector")
@@ -402,6 +401,10 @@ class FastTextModel:
                 self._optimizer_phrase_loss = hyperparameters.get_optimizer().to_tf_optimizer()
                 self._minimize_phrase_loss = self._optimizer_phrase_loss.minimize(self._nce_phrase_loss, var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_phrase.name))
 
+            self._optimizer_all_loss = hyperparameters.get_optimizer().to_tf_optimizer()
+            self._minimize_all_loss = self._optimizer_all_loss.minimize(self._nce_phrase_loss + self._nce_ngram_loss)
+
+
                 # trainable_vars =  tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_phrase.name)
                 # grads = tf.gradients(self._nce_phrase_loss, trainable_vars)
                 # grads, _ = tf.clip_by_global_norm(grads, 0.01)  # gradient clipping
@@ -426,12 +429,18 @@ class FastTextModel:
     def train(self, global_step: int) -> None:
         with self._graph.as_default():
 
-            if global_step <= 250000:
-                _, calc_summary = self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss])
-                self._writer.add_summary(calc_summary, global_step=global_step)
-            else:
-                _, calc_summary = self._session.run([self._minimize_phrase_loss, self._summary_phrase])
-                self._writer.add_summary(calc_summary, global_step=global_step)
+
+            _, calc_summary_ngram, calc_summary_phrase = self._session.run([self._minimize_all_loss, self._summary_ngram_loss, self._summary_phrase])
+            self._writer.add_summary(calc_summary_ngram, global_step=global_step)
+            self._writer.add_summary(calc_summary_phrase, global_step=global_step)
+
+
+            # if global_step <= 250000:
+            #     _, calc_summary = self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss])
+            #     self._writer.add_summary(calc_summary, global_step=global_step)
+            # else:
+            #     _, calc_summary = self._session.run([self._minimize_phrase_loss, self._summary_phrase])
+            #     self._writer.add_summary(calc_summary, global_step=global_step)
 
             if global_step % 1000 == 0:
                 self._saver.save(self._session, './logs/' + self._hyperparameters.get_name() + '.ckpt', global_step)
