@@ -301,8 +301,8 @@ class FastTextModel:
                     # attention_optimized_outputs = tf.reduce_sum(target_phrase_ngram_embeddings, axis=-2)
 
 
-                lstm_cell_fw = tf.nn.rnn_cell.LSTMCell(embedding_size/2)
-                lstm_cell_bw = tf.nn.rnn_cell.LSTMCell(embedding_size/2)
+                lstm_cell_fw = tf.nn.rnn_cell.LSTMCell(embedding_size/2, activation=tf.nn.relu)
+                lstm_cell_bw = tf.nn.rnn_cell.LSTMCell(embedding_size/2, activation=tf.nn.relu)
                 lstm_initial_state_fw = lstm_cell_fw.zero_state(self._hyperparameters.get_batch_size(), dtype=tf.float32)
                 lstm_initial_state_bw = lstm_cell_bw.zero_state(self._hyperparameters.get_batch_size(), dtype=tf.float32)
 
@@ -392,7 +392,7 @@ class FastTextModel:
                     name="NoiseContrastiveLoss"
                 )
 
-                self._nce_phrase_loss = tf.reduce_mean(self._nce_phrase_loss_batch)  + 100 * lstm_overextension - 50 * lstm_stddev_loss
+                self._nce_phrase_loss = tf.reduce_mean(self._nce_phrase_loss_batch) #  + 100 * lstm_overextension - 50 * lstm_stddev_loss
                 self._summary_phrase_loss = tf.summary.scalar("phrase_loss_mean", tf.reduce_sum(self._nce_phrase_loss_batch) / self._hyperparameters.get_batch_size())
                 self._summary_phrase_lstm_stddev = tf.summary.scalar("lstm_stddev_loss", lstm_stddev_loss)
                 self._summary_phrase_overextension = tf.summary.scalar("lstm_overextension", lstm_overextension)
