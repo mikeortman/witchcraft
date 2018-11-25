@@ -319,7 +319,7 @@ class FastTextModel:
                 print("LSTM_FINAL_OUTPUTS", lstm_final_outputs)
                 lstm_final_outputs = tf.Print(lstm_final_outputs, [lstm_final_outputs], "LSTM")
 
-                lstm_overextension = tf.reduce_sum(tf.square(tf.maximum(tf.abs(lstm_final_outputs), 0.8) - 0.8))
+                lstm_overextension = tf.reduce_sum(tf.square(tf.maximum(tf.abs(lstm_final_outputs), 1) - 1))
                 lstm_overextension = tf.Print(lstm_overextension, [lstm_overextension], "LSTM_OVEREXTENSION")
 
                 lstm_final_outputs_norm = tf.nn.l2_normalize(lstm_final_outputs, axis=-1)
@@ -392,7 +392,7 @@ class FastTextModel:
                     name="NoiseContrastiveLoss"
                 )
 
-                self._nce_phrase_loss = tf.reduce_mean(self._nce_phrase_loss_batch) #  + 100 * lstm_overextension - 50 * lstm_stddev_loss
+                self._nce_phrase_loss = tf.reduce_mean(self._nce_phrase_loss_batch) # + lstm_overextension # - 50 * lstm_stddev_loss
                 self._summary_phrase_loss = tf.summary.scalar("phrase_loss_mean", tf.reduce_sum(self._nce_phrase_loss_batch) / self._hyperparameters.get_batch_size())
                 self._summary_phrase_lstm_stddev = tf.summary.scalar("lstm_stddev_loss", lstm_stddev_loss)
                 self._summary_phrase_overextension = tf.summary.scalar("lstm_overextension", lstm_overextension)
@@ -402,7 +402,7 @@ class FastTextModel:
                 self._minimize_phrase_loss = self._optimizer_phrase_loss.minimize(self._nce_phrase_loss, var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_phrase.name))
 
             self._optimizer_all_loss = hyperparameters.get_optimizer().to_tf_optimizer()
-            self._minimize_all_loss = self._optimizer_all_loss.minimize(self._nce_phrase_loss + self._nce_ngram_loss)
+            self._minimize_all_loss = self._optimizer_all_loss.minimize(self._nce_phrase_loss)
 
 
                 # trainable_vars =  tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_phrase.name)
