@@ -318,8 +318,7 @@ class FastTextModel:
 
                 print("LSTM_FINAL_OUTPUTS", lstm_final_outputs)
                 lstm_final_outputs = tf.Print(lstm_final_outputs, [lstm_final_outputs], "LSTM")
-
-                lstm_overextension = tf.reduce_sum(tf.square(tf.maximum(tf.abs(lstm_final_outputs), 1) - 1))
+                lstm_overextension = tf.reduce_sum(tf.maximum((lstm_final_outputs - 2)**4 - 1, 0))
                 lstm_overextension = tf.Print(lstm_overextension, [lstm_overextension], "LSTM_OVEREXTENSION")
 
                 lstm_final_outputs_norm = tf.nn.l2_normalize(lstm_final_outputs, axis=-1)
@@ -392,7 +391,7 @@ class FastTextModel:
                     name="NoiseContrastiveLoss"
                 )
 
-                self._nce_phrase_loss = tf.reduce_mean(self._nce_phrase_loss_batch) # + lstm_overextension # - 50 * lstm_stddev_loss
+                self._nce_phrase_loss = tf.reduce_mean(self._nce_phrase_loss_batch) + lstm_overextension #50 * lstm_stddev_loss
                 self._summary_phrase_loss = tf.summary.scalar("phrase_loss_mean", tf.reduce_sum(self._nce_phrase_loss_batch) / self._hyperparameters.get_batch_size())
                 self._summary_phrase_lstm_stddev = tf.summary.scalar("lstm_stddev_loss", lstm_stddev_loss)
                 self._summary_phrase_overextension = tf.summary.scalar("lstm_overextension", lstm_overextension)
@@ -433,7 +432,7 @@ class FastTextModel:
             # self._writer.add_summary(calc_summary_phrase, global_step=global_step)
 
 
-            if global_step <= 250000:
+            if global_step <= 150000:
                 _, calc_summary = self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss])
                 self._writer.add_summary(calc_summary, global_step=global_step)
             else:
