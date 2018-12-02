@@ -12,7 +12,7 @@ from witchcraft.util.listutil import skipgramify
 class FastTextHyperparameters:
     def __init__(self) -> None:
         self._embedding_size: int = 300
-        self._batch_size: int = 256
+        self._batch_size: int = 512
         self._window_size: int = 4
         self._subsample_threshold: Optional[float] = None
         self._optimizer: Optimizer = WitchcraftAdamOptimizer(learning_rate=0.001)
@@ -227,7 +227,7 @@ class FastTextModel:
         with self._graph.as_default():
             with tf.variable_scope("NgramVectorization") as scope_ngram:
                 self._ngram_train_dataset = FastTextVocabNgramDataset(self._vocab)
-                self._ngram_train_dataset = self._ngram_train_dataset.shuffle(shuffle_buffer=500000)
+                self._ngram_train_dataset = self._ngram_train_dataset.shuffle(shuffle_buffer=1000000)
                 self._ngram_train_dataset = self._ngram_train_dataset.repeat()
                 self._ngram_train_dataset = self._ngram_train_dataset.batch(batch_size=self._hyperparameters.get_batch_size())
 
@@ -428,19 +428,18 @@ class FastTextModel:
 
     def train(self, global_step: int) -> None:
         with self._graph.as_default():
+            # _, calc_summary_ngram, calc_summary_phrase = self._session.run([self._minimize_all_loss, self._summary_ngram_loss, self._summary_phrase])
+            # self._writer.add_summary(calc_summary_ngram, global_step=global_step)
+            # self._writer.add_summary(calc_summary_phrase, global_step=global_step)
 
 
-            _, calc_summary_ngram, calc_summary_phrase = self._session.run([self._minimize_all_loss, self._summary_ngram_loss, self._summary_phrase])
-            self._writer.add_summary(calc_summary_ngram, global_step=global_step)
-            self._writer.add_summary(calc_summary_phrase, global_step=global_step)
-
-
-            # if global_step <= 250000:
-            #     _, calc_summary = self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss])
-            #     self._writer.add_summary(calc_summary, global_step=global_step)
-            # else:
-            #     _, calc_summary = self._session.run([self._minimize_phrase_loss, self._summary_phrase])
-            #     self._writer.add_summary(calc_summary, global_step=global_step)
+            if global_step <= 250000:
+                _, calc_summary = self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss])
+                self._writer.add_summary(calc_summary, global_step=global_step)
+            else:
+                _, ngram_summary, phrase_summary= self._session.run([self._minimize_all_loss, self._summary_ngram_loss, self._summary_phrase])
+                self._writer.add_summary(ngram_summary, global_step=global_step)
+                self._writer.add_summary(phrase_summary, global_step=global_step)
 
             if global_step % 1000 == 0:
                 self._saver.save(self._session, './logs/' + self._hyperparameters.get_name() + '.ckpt', global_step)
