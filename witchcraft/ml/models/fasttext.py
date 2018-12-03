@@ -100,30 +100,51 @@ class FastTextVocab:
         self._vocab_counts = sorted(self._vocab_counts, key=lambda a: -a[1])
         self._vocab_counts = self._vocab_counts[:MAX_VOCAB_SIZE - 1]
 
+        done_pruning = False
+        while not done_pruning:
+            print("Pruning...")
+            self._ngram_counts = {}
+            for (phrase, _) in self._vocab_counts:
+                for ngram in self.create_phrase_ngrams(phrase):
+                    if ngram not in self._ngram_counts:
+                        self._ngram_counts[ngram] = 0
+
+                    self._ngram_counts[ngram] += 1
+
+            self._ngram_counts = [(w, c) for w, c in self._ngram_counts.items() if c >= 5]
+            print("Total passing ngrams: " + str(len(self._ngram_counts)))
+
+            ngram_mapping = {w: True for (w, _) in self._ngram_counts}
+            pruned_vocab_counts = []
+            for (w, c) in self._vocab_counts:
+                should_count = True
+                for ngram in self.create_phrase_ngrams(w):
+                    if ngram not in ngram_mapping:
+                        should_count = False
+                        break
+
+                if should_count:
+                    pruned_vocab_counts += [(w,c)]
+
+            print("Pruned down to " + str(len(pruned_vocab_counts)) + " from " + str(len(self._vocab_counts)))
+            if len(pruned_vocab_counts) == len(self._vocab_counts):
+                done_pruning = True
+            else:
+                self._vocab_counts = pruned_vocab_counts
+
+        print ("Done pruning")
+        self._ngram_counts = sorted(self._ngram_counts, key=lambda a: -a[1]) #Needed only for debugging below
+
+
         i = 1
         self._vocab_to_id = {"[NOP]": 0}
         for (w, c) in self._vocab_counts:
             self._vocab_to_id[w] = i
             i += 1
 
-
-        self._ngram_counts = {}
-        for (phrase, _) in self._vocab_counts:
-            for ngram in self.create_phrase_ngrams(phrase):
-                if ngram not in self._ngram_counts:
-                    self._ngram_counts[ngram] = 0
-
-                self._ngram_counts[ngram] += 1
-
-        self._ngram_counts = [(w, c) for w, c in self._ngram_counts.items()]
-        self._ngram_counts = sorted(self._ngram_counts, key=lambda a: -a[1])
-        print(self._ngram_counts[:500])
-        print(len(self._ngram_counts))
-
+        i = 1
         self._ngram_to_id = {"[NOP]": 0}
         self._id_to_ngram = ["[NOP]"]
-
-        i = 1
         for (ngram, _) in self._ngram_counts:
             self._ngram_to_id[ngram] = i # 0 is NOP
             self._id_to_ngram += [ngram]
@@ -200,7 +221,7 @@ class FastTextVocabCorpusDataset(WitchcraftDataset):
                     phrases = phrases[:MAX_PHRASE_LEN]
                     phrases += [0] * (MAX_PHRASE_LEN - len(phrases))
 
-                    for (target, context, distance) in skipgramify(phrases, 5):
+                    for (target, context, distance) in skipgramify(phrases, 10):
                         if target == 0 or context == 0 or distance == 0:
                             continue
 
@@ -272,6 +293,7 @@ class FastTextModel:
                 self._phrase_train_dataset = self._phrase_train_dataset.shuffle(shuffle_buffer=500000)
                 self._phrase_train_dataset = self._phrase_train_dataset.repeat()
                 self._phrase_train_dataset = self._phrase_train_dataset.batch(batch_size=self._hyperparameters.get_batch_size())
+
                 # self._phrase_train_dataset = self._phrase_train_dataset.prefetch(buffer_size=100000)
                 (target_phrases, positive_phrases_context_labels, _) = self._phrase_train_dataset.to_tf_iterator().get_next()
 
@@ -284,7 +306,7 @@ class FastTextModel:
                 target_phrase_ngram_maps = tf.gather(self._phrase_ngram_map, target_phrases)
                 target_phrase_ngram_embeddings = tf.gather(self._ngram_embeddings, target_phrase_ngram_maps)
 
-                print("ES", target_phrase_ngram_embeddings)
+                # print("ES", target_phrase_ngram_embeddings)
 
 
 
@@ -316,9 +338,9 @@ class FastTextModel:
 
                 lstm_final_outputs = tf.concat([final_state_fw.h, final_state_bw.h], axis=-1)
 
-                print("LSTM_FINAL_OUTPUTS", lstm_final_outputs)
+                # print("LSTM_FINAL_OUTPUTS", lstm_final_outputs)
                 lstm_final_outputs = tf.Print(lstm_final_outputs, [lstm_final_outputs], "LSTM")
-                lstm_overextension = tf.reduce_sum(tf.maximum((lstm_final_outputs - 2)**4 - 1, 0))
+                lstm_overextension = tf.reduce_sum(tf.maximum((lstm_final_outputs - 2)**4 - 1, 0) + 1)
                 lstm_overextension = tf.Print(lstm_overextension, [lstm_overextension], "LSTM_OVEREXTENSION")
 
                 lstm_final_outputs_norm = tf.nn.l2_normalize(lstm_final_outputs, axis=-1)
@@ -391,7 +413,7 @@ class FastTextModel:
                     name="NoiseContrastiveLoss"
                 )
 
-                self._nce_phrase_loss = tf.reduce_mean(self._nce_phrase_loss_batch) + lstm_overextension #50 * lstm_stddev_loss
+                self._nce_phrase_loss = tf.reduce_mean(self._nce_phrase_loss_batch) * lstm_overextension #50 * lstm_stddev_loss
                 self._summary_phrase_loss = tf.summary.scalar("phrase_loss_mean", tf.reduce_sum(self._nce_phrase_loss_batch) / self._hyperparameters.get_batch_size())
                 self._summary_phrase_lstm_stddev = tf.summary.scalar("lstm_stddev_loss", lstm_stddev_loss)
                 self._summary_phrase_overextension = tf.summary.scalar("lstm_overextension", lstm_overextension)
@@ -419,7 +441,7 @@ class FastTextModel:
             for (phrase, _) in self._vocab:
                 phrase_ngram_map_arr += [self._vocab.create_phrase_ngrams_by_id(phrase, MAX_PHRASE_LEN)]
 
-            print(phrase_ngram_map_arr)
+            # print(phrase_ngram_map_arr)
 
             self._session.run(tf.global_variables_initializer(), feed_dict={self._phrase_ngram_map_placeholder: phrase_ngram_map_arr})
 
@@ -427,14 +449,13 @@ class FastTextModel:
 
     def train(self, global_step: int) -> None:
         with self._graph.as_default():
-            # _, calc_summary_ngram, calc_summary_phrase = self._session.run([self._minimize_all_loss, self._summary_ngram_loss, self._summary_phrase])
-            # self._writer.add_summary(calc_summary_ngram, global_step=global_step)
-            # self._writer.add_summary(calc_summary_phrase, global_step=global_step)
-
-
-            if global_step <= 150000:
+            if global_step <= 25000:
                 _, calc_summary = self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss])
                 self._writer.add_summary(calc_summary, global_step=global_step)
+            elif global_step <= 50000:
+                _, ngram_summary, phrase_summary= self._session.run([self._minimize_ngram_loss, self._summary_ngram_loss, self._summary_phrase])
+                self._writer.add_summary(ngram_summary, global_step=global_step)
+                self._writer.add_summary(phrase_summary, global_step=global_step)
             else:
                 _, ngram_summary, phrase_summary= self._session.run([self._minimize_all_loss, self._summary_ngram_loss, self._summary_phrase])
                 self._writer.add_summary(ngram_summary, global_step=global_step)
